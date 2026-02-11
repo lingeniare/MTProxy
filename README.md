@@ -15,7 +15,7 @@ MTProxy — единственный тип прокси, который Telegra
 Подключитесь к серверу и выполните:
 
 ```bash
-sudo bash install_mtproxy.sh
+git clone https://github.com/lingeniare/MTProxy.git && cd MTProxy && sudo bash install_mtproxy.sh
 ```
 
 Через пару минут скрипт покажет параметры подключения:

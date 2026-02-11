@@ -177,7 +177,7 @@ else
 fi
 
 # ─── 8. Определяем IP сервера ──────────────────────────────
-SERVER_IP=$(curl -s -4 ifconfig.me 2>/dev/null || curl -s -4 icanhazip.com 2>/dev/null || echo "YOUR_SERVER_IP")
+SERVER_IP=$(curl -s -4 --max-time 5 ifconfig.me 2>/dev/null || curl -s -4 --max-time 5 icanhazip.com 2>/dev/null || ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+' || echo "YOUR_SERVER_IP")
 
 # ─── Результат ──────────────────────────────────────────────
 DD_SECRET="dd${SECRET}"
@@ -187,15 +187,15 @@ echo -e "${BOLD}╔════════════════════�
 echo -e "${BOLD}║  ${GREEN}✅  MTProxy успешно установлен!${NC}${BOLD}                                        ║${NC}"
 echo -e "${BOLD}╠══════════════════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${BOLD}║${NC}                                                                          ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${CYAN}Сервер:${NC}  $SERVER_IP"
-echo -e "${BOLD}║${NC}  ${CYAN}Порт:${NC}    $PROXY_PORT"
-echo -e "${BOLD}║${NC}  ${CYAN}Секрет:${NC}  $DD_SECRET"
+printf "${BOLD}║${NC}  %-15s %-54s ${BOLD}║${NC}\n" "Сервер:" "$SERVER_IP"
+printf "${BOLD}║${NC}  %-15s %-54s ${BOLD}║${NC}\n" "Порт:" "$PROXY_PORT"
+printf "${BOLD}║${NC}  %-15s %-54s ${BOLD}║${NC}\n" "Секрет:" "$DD_SECRET"
 echo -e "${BOLD}║${NC}                                                                          ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${YELLOW}Ссылка для подключения:${NC}"
-echo -e "${BOLD}║${NC}  tg://proxy?server=${SERVER_IP}&port=${PROXY_PORT}&secret=${DD_SECRET}"
+echo -e "${BOLD}║${NC}  ${YELLOW}Ссылка для подключения:${NC}                                                 ${BOLD}║${NC}"
+printf "${BOLD}║${NC}  %-71s ${BOLD}║${NC}\n" "tg://proxy?server=${SERVER_IP}&port=${PROXY_PORT}&secret=${DD_SECRET}"
 echo -e "${BOLD}║${NC}                                                                          ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${YELLOW}Или через браузер:${NC}"
-echo -e "${BOLD}║${NC}  https://t.me/proxy?server=${SERVER_IP}&port=${PROXY_PORT}&secret=${DD_SECRET}"
+echo -e "${BOLD}║${NC}  ${YELLOW}Или через браузер:${NC}                                                      ${BOLD}║${NC}"
+printf "${BOLD}║${NC}  %-71s ${BOLD}║${NC}\n" "https://t.me/proxy?server=${SERVER_IP}&port=${PROXY_PORT}&secret=${DD_SECRET}"
 echo -e "${BOLD}║${NC}                                                                          ${BOLD}║${NC}"
 echo -e "${BOLD}╠══════════════════════════════════════════════════════════════════════════╣${NC}"
 echo -e "${BOLD}║${NC}  ${CYAN}Полезные команды:${NC}                                                       ${BOLD}║${NC}"
