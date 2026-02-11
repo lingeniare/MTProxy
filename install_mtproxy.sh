@@ -56,9 +56,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 echo ""
-echo -e "${BOLD}╔══════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║     MTProxy — установка и настройка      ║${NC}"
-echo -e "${BOLD}╚══════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}>> MTProxy — установка и настройка${NC}"
 echo ""
 
 # ─── 1. Зависимости ────────────────────────────────────────
@@ -102,8 +100,8 @@ ok "MTProxy собран"
 
 # ─── 3. Конфигурация Telegram ──────────────────────────────
 info "Загружаю конфигурацию Telegram..."
-curl -s https://core.telegram.org/getProxySecret -o "$INSTALL_DIR/proxy-secret"
-curl -s https://core.telegram.org/getProxyConfig -o "$INSTALL_DIR/proxy-multi.conf"
+curl -sSf https://core.telegram.org/getProxySecret -o "$INSTALL_DIR/proxy-secret" || fail "Не удалось скачать proxy-secret"
+curl -sSf https://core.telegram.org/getProxyConfig -o "$INSTALL_DIR/proxy-multi.conf" || fail "Не удалось скачать proxy-multi.conf"
 ok "Конфигурация загружена"
 
 # ─── 4. Генерация секрета ──────────────────────────────────
@@ -142,7 +140,9 @@ EOF
 
 systemctl daemon-reload
 systemctl enable MTProxy.service > /dev/null 2>&1
-systemctl restart MTProxy.service
+if ! systemctl restart MTProxy.service; then
+    fail "Не удалось запустить сервис MTProxy. Проверьте статус: systemctl status MTProxy"
+fi
 ok "Сервис MTProxy запущен и добавлен в автозагрузку"
 
 # ─── 6. Cron: обновление конфига каждый день в 04:00 ───────
@@ -150,7 +150,7 @@ CRON_CMD="curl -s https://core.telegram.org/getProxyConfig -o $INSTALL_DIR/proxy
 CRON_LINE="0 4 * * * $CRON_CMD"
 
 # Добавляем если ещё нет
-(crontab -l 2>/dev/null | grep -v "getProxyConfig" ; echo "$CRON_LINE") | crontab -
+( { crontab -l 2>/dev/null || true; } | { grep -v "getProxyConfig" || true; } ; echo "$CRON_LINE" ) | crontab -
 ok "Cron настроен: конфиг обновляется ежедневно в 04:00"
 
 # ─── 7. Firewall (UFW) ─────────────────────────────────────
@@ -183,27 +183,26 @@ SERVER_IP=$(curl -s -4 --max-time 5 ifconfig.me 2>/dev/null || curl -s -4 --max-
 DD_SECRET="dd${SECRET}"
 
 echo ""
-echo -e "${BOLD}╔══════════════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║  ${GREEN}✅  MTProxy успешно установлен!${NC}${BOLD}                                        ║${NC}"
-echo -e "${BOLD}╠══════════════════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${BOLD}║${NC}                                                                          ${BOLD}║${NC}"
-printf "${BOLD}║${NC}  %-15s %-54s ${BOLD}║${NC}\n" "Сервер:" "$SERVER_IP"
-printf "${BOLD}║${NC}  %-15s %-54s ${BOLD}║${NC}\n" "Порт:" "$PROXY_PORT"
-printf "${BOLD}║${NC}  %-15s %-54s ${BOLD}║${NC}\n" "Секрет:" "$DD_SECRET"
-echo -e "${BOLD}║${NC}                                                                          ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${YELLOW}Ссылка для подключения:${NC}                                                 ${BOLD}║${NC}"
-printf "${BOLD}║${NC}  %-71s ${BOLD}║${NC}\n" "tg://proxy?server=${SERVER_IP}&port=${PROXY_PORT}&secret=${DD_SECRET}"
-echo -e "${BOLD}║${NC}                                                                          ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${YELLOW}Или через браузер:${NC}                                                      ${BOLD}║${NC}"
-printf "${BOLD}║${NC}  %-71s ${BOLD}║${NC}\n" "https://t.me/proxy?server=${SERVER_IP}&port=${PROXY_PORT}&secret=${DD_SECRET}"
-echo -e "${BOLD}║${NC}                                                                          ${BOLD}║${NC}"
-echo -e "${BOLD}╠══════════════════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${BOLD}║${NC}  ${CYAN}Полезные команды:${NC}                                                       ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}    systemctl status MTProxy    — статус сервиса                          ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}    systemctl restart MTProxy   — перезапуск                              ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}    systemctl stop MTProxy      — остановка                               ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}    curl localhost:$STATS_PORT/stats   — статистика                            ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}                                                                          ${BOLD}║${NC}"
-echo -e "${BOLD}║${NC}  ${CYAN}Зарегистрируйте прокси:${NC}  https://t.me/MTProxybot                       ${BOLD}║${NC}"
-echo -e "${BOLD}╚══════════════════════════════════════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}----------------------------------------------------------------------${NC}"
+echo -e "${GREEN}${BOLD}✅  MTProxy успешно установлен!${NC}"
+echo -e "${BOLD}----------------------------------------------------------------------${NC}"
+echo ""
+printf "%-15s %s\n" "Сервер:" "$SERVER_IP"
+printf "%-15s %s\n" "Порт:" "$PROXY_PORT"
+printf "%-15s %s\n" "Секрет:" "$DD_SECRET"
+echo ""
+echo -e "${YELLOW}${BOLD}Ссылка для подключения:${NC}"
+echo "tg://proxy?server=${SERVER_IP}&port=${PROXY_PORT}&secret=${DD_SECRET}"
+echo ""
+echo -e "${YELLOW}${BOLD}Или через браузер:${NC}"
+echo "https://t.me/proxy?server=${SERVER_IP}&port=${PROXY_PORT}&secret=${DD_SECRET}"
+echo ""
+echo -e "${BOLD}----------------------------------------------------------------------${NC}"
+echo -e "${CYAN}Полезные команды:${NC}"
+echo "  systemctl status MTProxy    — статус сервиса"
+echo "  systemctl restart MTProxy   — перезапуск"
+echo "  systemctl stop MTProxy      — остановка"
+echo "  curl localhost:$STATS_PORT/stats   — статистика"
+echo ""
+echo -e "${CYAN}Зарегистрируйте прокси:${NC} https://t.me/MTProxybot"
 echo ""
