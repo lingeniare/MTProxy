@@ -118,7 +118,7 @@ sudo bash install_mtproxy.sh -P <ваш_тег>
 
 ## 👤 Автор
 
-Создано **[@ingeniare](https://github.com/ingeniare)** при участии **Claude Opus 4.6**
+Создано **[@ingeniare](https://github.com/lingeniare)** при участии **Claude Opus 4.6**
 
 ---
 
