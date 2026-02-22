@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-#  MTProxy — полное удаление
+#  Деинсталляция MTProxy — полное удаление всех компонентов
 # ============================================================
 set -euo pipefail
 
@@ -14,7 +14,7 @@ INSTALL_DIR="/opt/MTProxy"
 CONFIG_DIR="/etc/mtproxy"
 PORT=""
 
-# ─── Остановка и удаление сервиса ──────────────────────────
+# --- Остановка и удаление сервиса ---
 if [[ -f "$SERVICE_FILE" ]]; then
   PORT=$(awk '/-H/ {for(i=1;i<=NF;i++) if($i=="-H") {print $(i+1); exit}}' "$SERVICE_FILE" || true)
   systemctl stop MTProxy.service >/dev/null 2>&1 || true
@@ -24,13 +24,13 @@ if [[ -f "$SERVICE_FILE" ]]; then
   echo "[OK] Сервис остановлен и удалён"
 fi
 
-# ─── Удаление cron-задания ─────────────────────────────────
+# --- Удаление задания планировщика ---
 if crontab -l >/dev/null 2>&1; then
   (crontab -l 2>/dev/null | grep -v "update_config\|getProxyConfig") | crontab - 2>/dev/null || true
-  echo "[OK] Cron-задания удалены"
+  echo "[OK] Задание планировщика удалено"
 fi
 
-# ─── Удаление правил файрвола ──────────────────────────────
+# --- Удаление правил межсетевого экрана ---
 if [[ -n "$PORT" ]]; then
   if command -v ufw >/dev/null 2>&1; then
     ufw delete allow "${PORT}/tcp" >/dev/null 2>&1 || true
@@ -39,29 +39,28 @@ if [[ -n "$PORT" ]]; then
     firewall-cmd --reload >/dev/null 2>&1 || true
   fi
 
-  # Удаление rate-limiting правил iptables
+  # Удаление правил rate-limiting
   if command -v iptables >/dev/null 2>&1; then
     iptables -D INPUT -p tcp --dport "$PORT" -j ACCEPT >/dev/null 2>&1 || true
     iptables -D INPUT -p tcp --dport "$PORT" -m conntrack --ctstate NEW -j MTPROXY_LIMIT >/dev/null 2>&1 || true
     iptables -F MTPROXY_LIMIT >/dev/null 2>&1 || true
     iptables -X MTPROXY_LIMIT >/dev/null 2>&1 || true
-    # Сохраняем изменения если iptables-persistent установлен
     if command -v netfilter-persistent >/dev/null 2>&1; then
       netfilter-persistent save >/dev/null 2>&1 || true
     fi
   fi
-  echo "[OK] Правила файрвола удалены"
+  echo "[OK] Правила межсетевого экрана удалены"
 fi
 
-# ─── Удаление пользователя mtproxy ────────────────────────
+# --- Удаление системного пользователя ---
 if id mtproxy &>/dev/null; then
   userdel mtproxy 2>/dev/null || true
   echo "[OK] Пользователь mtproxy удалён"
 fi
 
-# ─── Удаление файлов ──────────────────────────────────────
+# --- Удаление файлов и конфигураций ---
 rm -rf "$INSTALL_DIR"
 rm -rf "$CONFIG_DIR"
 
 echo ""
-echo "MTProxy полностью удалён"
+echo "MTProxy полностью деинсталлирован."
