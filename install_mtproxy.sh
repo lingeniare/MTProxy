@@ -37,6 +37,7 @@ PROXY_TAG=""
 FAKE_TLS_DOMAIN="www.google.com"  # Домен для Fake TLS
 RATE_LIMIT="5/min"          # Лимит новых подключений на IP
 RATE_BURST=10               # Всплеск для rate-limit
+FORCE_UNSHARE="${FORCE_UNSHARE:-auto}"  # 1=всегда, 0=никогда, auto=по pid_max/ns_last_pid
 
 # --- Служебные функции ---
 info()  { echo -e "${CYAN}[INFO]${NC}  $*"; }
@@ -122,6 +123,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# --- Проверка режимов запуска ---
+if [[ "$FORCE_UNSHARE" != "0" && "$FORCE_UNSHARE" != "1" && "$FORCE_UNSHARE" != "auto" ]]; then
+    fail "FORCE_UNSHARE должен быть 0, 1 или auto (текущее значение: $FORCE_UNSHARE)"
+fi
+
 # --- Проверка прав root ---
 if [[ $EUID -ne 0 ]]; then
     fail "Запустите скрипт от root:  sudo bash $0"
@@ -138,7 +144,7 @@ apt-get update -qq
 # xxd может быть в пакете xxd (Ubuntu 23.10+) или vim-common (Ubuntu 22.04)
 apt-get install -y -qq \
     git curl build-essential libssl-dev zlib1g-dev \
-    iproute2 coreutils cron \
+    iproute2 coreutils cron util-linux \
     > /dev/null 2>&1
 
 # Установка xxd: пробуем отдельный пакет, затем vim-common
@@ -326,16 +332,44 @@ if [[ -n "$INTERNAL_IP" && "$INTERNAL_IP" != "$SERVER_IP_TMP" && "$SERVER_IP_TMP
     NAT_INFO="--nat-info ${INTERNAL_IP}:${SERVER_IP_TMP}"
 fi
 
+PID_MAX=$(cat /proc/sys/kernel/pid_max 2>/dev/null || echo 32768)
+NS_LAST_PID=$(cat /proc/sys/kernel/ns_last_pid 2>/dev/null || echo 0)
+USE_UNSHARE=0
+
+case "$FORCE_UNSHARE" in
+    1) USE_UNSHARE=1 ;;
+    0) USE_UNSHARE=0 ;;
+    auto)
+        # MTProxy падает на assert при PID > 65535, поэтому включаем PID namespace заранее.
+        if [[ "$PID_MAX" -gt 65535 || "$NS_LAST_PID" -gt 65535 ]]; then
+            USE_UNSHARE=1
+        fi
+        ;;
+esac
+
+if [[ "$USE_UNSHARE" -eq 1 ]]; then
+    if [[ ! -x /usr/bin/unshare ]]; then
+        fail "Требуется /usr/bin/unshare (пакет util-linux), но он не найден"
+    fi
+    EXEC_PREFIX="/usr/bin/unshare --pid --fork --mount-proc --"
+    info "Включён PID namespace workaround (FORCE_UNSHARE=$FORCE_UNSHARE, pid_max=$PID_MAX, ns_last_pid=$NS_LAST_PID)"
+else
+    EXEC_PREFIX=""
+    info "PID namespace workaround не требуется (FORCE_UNSHARE=$FORCE_UNSHARE, pid_max=$PID_MAX, ns_last_pid=$NS_LAST_PID)"
+fi
+
 cat > /etc/systemd/system/MTProxy.service <<EOF
 [Unit]
 Description=MTProxy Telegram Proxy
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
 WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/objs/bin/mtproto-proxy \\
+ExecStart=${EXEC_PREFIX} $INSTALL_DIR/objs/bin/mtproto-proxy \\
     -u mtproxy \\
     -p $STATS_PORT \\
     -H $PROXY_PORT \\
@@ -347,6 +381,7 @@ ExecStart=$INSTALL_DIR/objs/bin/mtproto-proxy \\
     --aes-pwd $INSTALL_DIR/proxy-secret \\
     $INSTALL_DIR/proxy-multi.conf \\
     -M $WORKERS
+KillMode=control-group
 Restart=on-failure
 RestartSec=5
 
