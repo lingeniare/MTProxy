@@ -20,7 +20,7 @@ git clone https://github.com/lingeniare/MTProxy.git && cd MTProxy && sudo bash i
 4. Загружает и валидирует конфигурационные файлы Telegram.
 5. Генерирует криптографический секрет и активирует Fake TLS.
 6. Автоматически определяет NAT-конфигурацию для облачных VPS.
-7. Регистрирует systemd-сервис с автозапуском и диагностическим эндпоинтом.
+7. Регистрирует systemd-сервис с автозапуском, ограничением restart-storm и диагностическим эндпоинтом.
 8. Настраивает ограничение частоты соединений через iptables.
 9. Создает задание планировщика для ежедневного обновления конфигурации Telegram с проверкой целостности и автоматическим откатом.
 10. Открывает порт в межсетевом экране и сохраняет правила на случай перезагрузки.
@@ -47,6 +47,41 @@ git clone https://github.com/lingeniare/MTProxy.git && cd MTProxy && sudo bash i
 | `--tag`, `-P` | Тег из @MTProxybot | (опционально) |
 | `--rate-limit` | Лимит новых соединений на IP | `5/min` |
 | `--rate-burst` | Допустимый всплеск | `10` |
+
+Переменные окружения:
+
+| Переменная | Описание | Значение по умолчанию |
+|------------|----------|-----------------------|
+| `FORCE_UNSHARE=auto\|1\|0` | Режим PID namespace workaround: `auto` включает `unshare`, если `pid_max > 65535` или `ns_last_pid > 65535`; `1` включает всегда; `0` отключает | `auto` |
+
+## Workaround для PID > 65535
+
+На системах с большим `kernel.pid_max` (например `4194304`) MTProxy может падать при старте с assert:
+
+```text
+mtproto-proxy: common/pid.c:42: init_common_PID: Assertion `!(p & 0xffff0000)' failed.
+```
+
+Причина: текущая версия `mtproto-proxy` ожидает PID в 16-битном диапазоне, а systemd может выдать процессу PID больше `65535`.
+
+Скрипт автоматически включает локальный workaround через PID namespace (совместимо с Ubuntu 24.04 / systemd 255):
+
+```text
+/usr/bin/unshare --pid --fork --mount-proc -- /opt/MTProxy/objs/bin/mtproto-proxy ...
+```
+
+Это не меняет глобальные sysctl и не требует контейнеризации. В unit также добавлены:
+
+- `StartLimitIntervalSec=60`
+- `StartLimitBurst=5`
+
+чтобы ограничить restart-storm при повторных ошибках старта.
+
+Проверка:
+
+1. `systemctl cat MTProxy` — в `ExecStart` должен быть `unshare`, если workaround активирован.
+2. `journalctl -u MTProxy -f` — в логах MTProxy PID обычно видны как `[1]`, `[2]`.
+3. `systemctl status MTProxy` — `MainPID` будет у `unshare`, дочерние `mtproto-proxy` работают в той же cgroup.
 
 ## Администрирование
 
