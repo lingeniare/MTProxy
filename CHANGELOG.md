@@ -1,4 +1,29 @@
-# Журнал изменений
+# Changelog
+
+## [1.3.0] - 2026-08-11
+
+### New Features
+
+*   **Multi-user secret management**: Per-user secrets in `/etc/mtproxy/secrets.d/` with `mtproxy-user.sh` utility (add / del / list / link). Revoking one user's access doesn't affect others.
+*   **Fake TLS domain auto-selection**: Installer picks a plausible domain from a built-in list (Microsoft, Discord CDN, Cloudflare, etc.), verifying DNS resolution and TLS 1.3 support. Custom list via `--domain-list`.
+*   **Port flexibility**: `--port auto` (random), `--port 443` (HTTPS camouflage), or explicit port number. Default is random to avoid fingerprinting.
+*   **IPv6 support**: `--ipv6` flag enables `-6` mode and outputs an IPv6 connection link.
+*   **Network tuning**: `--tune-net` applies sysctl tuning (BBR congestion control, buffer sizes, backlog).
+*   **Watchdog**: systemd timer checks service health every 2 minutes and auto-restarts on failure (with 3-strike threshold for stats endpoint).
+*   **Binary auto-update**: Weekly cron job pulls upstream changes, rebuilds, and restarts — with automatic rollback on build or startup failure.
+*   **Configuration persistence**: Settings saved to `/etc/mtproxy/env` for seamless re-installs and use by `mtproxy-user.sh`.
+*   **QR code**: Connection link displayed as QR code if `qrencode` is available.
+*   **Journald limit**: Log volume capped at 200M via journald drop-in.
+
+### Improvements
+
+*   **Uninstall**: Now removes watchdog timer/service, `mtproxy-user.sh`, sysctl drop-in, journald drop-in, and watchdog state file.
+*   **Rate-limiting resilience**: Installation continues with a warning if `iptables` modules (hashlimit/conntrack) are unavailable, instead of crashing.
+*   **NAT detection**: Auto-detects internal vs external IP for cloud VPS (AWS, Hetzner, etc.) and adds `--nat-info`.
+*   **Restart-storm protection**: `StartLimitIntervalSec=60` + `StartLimitBurst=5` in systemd unit.
+*   **Documentation**: README rewritten in English (Russian preserved as `README.ru.md`). CONTRIBUTING.md and SECURITY.md translated to English.
+
+---
 
 ## [1.2.0] - 2026-02-22
 

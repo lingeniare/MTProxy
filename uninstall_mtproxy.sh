@@ -20,13 +20,23 @@ if [[ -f "$SERVICE_FILE" ]]; then
   systemctl stop MTProxy.service >/dev/null 2>&1 || true
   systemctl disable MTProxy.service >/dev/null 2>&1 || true
   rm -f "$SERVICE_FILE"
-  systemctl daemon-reload >/dev/null 2>&1 || true
   echo "[OK] Сервис остановлен и удалён"
 fi
 
+# --- Удаление watchdog (timer + service) ---
+systemctl stop mtproxy-watchdog.timer >/dev/null 2>&1 || true
+systemctl disable mtproxy-watchdog.timer >/dev/null 2>&1 || true
+rm -f /etc/systemd/system/mtproxy-watchdog.timer
+rm -f /etc/systemd/system/mtproxy-watchdog.service
+systemctl daemon-reload >/dev/null 2>&1 || true
+echo "[OK] Watchdog удалён"
+
+# --- Удаление утилиты управления пользователями ---
+rm -f /usr/local/bin/mtproxy-user.sh
+
 # --- Удаление задания планировщика ---
 if crontab -l >/dev/null 2>&1; then
-  (crontab -l 2>/dev/null | grep -v "update_config\|getProxyConfig") | crontab - 2>/dev/null || true
+  (crontab -l 2>/dev/null | grep -v "update_config\|getProxyConfig\|update_binary") | crontab - 2>/dev/null || true
   echo "[OK] Задание планировщика удалено"
 fi
 
@@ -61,6 +71,11 @@ fi
 # --- Удаление файлов и конфигураций ---
 rm -rf "$INSTALL_DIR"
 rm -rf "$CONFIG_DIR"
+rm -f /etc/sysctl.d/90-mtproxy.conf
+rm -f /etc/systemd/journald.conf.d/90-mtproxy.conf
+rm -f /run/mtproxy-watchdog.fails
+sysctl --system >/dev/null 2>&1 || true
+echo "[OK] Файлы, sysctl и journald drop-in удалены"
 
 echo ""
 echo "MTProxy полностью деинсталлирован."

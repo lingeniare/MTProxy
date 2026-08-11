@@ -1,117 +1,186 @@
-# Инфраструктурный сценарий развертывания MTProxy
+**English** | [Русский](README.ru.md)
 
-Автоматизированное решение для установки и эксплуатации сервера MTProxy на Ubuntu 22.04/24.04 LTS. Сборка выполняется из официальных исходных кодов Telegram с акцентом на безопасность и противодействие DPI.
+# MTProxy — Automated Deployment for Ubuntu
 
-Все параметры рассчитаны автоматически. Пользователю достаточно выполнить одну команду.
+> One-command MTProxy server setup with Fake TLS obfuscation, multi-user secrets, watchdog, and DPI resistance. Built for Ubuntu 22.04 / 24.04 LTS.
 
-## Развертывание
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform: Ubuntu 22.04 / 24.04](https://img.shields.io/badge/Platform-Ubuntu%2022.04%20%2F%2024.04-E95420.svg)](https://ubuntu.com/)
+[![Version: 1.3.0](https://img.shields.io/badge/Version-1.3.0-success.svg)](CHANGELOG.md)
+
+---
+
+## Quick Start
 
 ```bash
 git clone https://github.com/lingeniare/MTProxy.git && cd MTProxy && sudo bash install_mtproxy.sh
 ```
 
-После завершения скрипт выведет готовую ссылку для подключения. Откройте её на телефоне — Telegram подхватит прокси автоматически.
+That's it. The script prints a ready-to-use `tg://proxy?...` link at the end — open it on your phone and Telegram connects automatically.
 
-## Что выполняет сценарий
+---
 
-1. Устанавливает системные зависимости (включая cron, если отсутствует).
-2. Создает изолированного системного пользователя `mtproxy`.
-3. Компилирует MTProxy из официального репозитория.
-4. Загружает и валидирует конфигурационные файлы Telegram.
-5. Генерирует криптографический секрет и активирует Fake TLS.
-6. Автоматически определяет NAT-конфигурацию для облачных VPS.
-7. Регистрирует systemd-сервис с автозапуском, ограничением restart-storm и диагностическим эндпоинтом.
-8. Настраивает ограничение частоты соединений через iptables.
-9. Создает задание планировщика для ежедневного обновления конфигурации Telegram с проверкой целостности и автоматическим откатом.
-10. Открывает порт в межсетевом экране и сохраняет правила на случай перезагрузки.
+## What the Installer Does
 
-## Архитектура безопасности
+1. Installs system dependencies (including `cron` if missing).
+2. Configures NTP time sync — clock drift breaks the MTProto handshake.
+3. Creates an isolated system user `mtproxy`.
+4. Compiles MTProxy from the [official Telegram source](https://github.com/TelegramMessenger/MTProxy).
+5. Downloads and validates Telegram configuration files.
+6. Picks a plausible Fake TLS domain (verifies DNS + TLS 1.3) and generates secrets.
+7. Auto-detects NAT for cloud VPS environments.
+8. Registers a hardened systemd service with auto-restart and restart-storm limiting.
+9. Sets up a watchdog: health check every 2 minutes, automatic restart on failure.
+10. Configures per-IP connection rate limiting via `iptables`.
+11. Schedules cron jobs: daily config refresh + weekly binary update (with rollback).
+12. Opens the firewall port and persists rules across reboots.
 
-| Механизм | Реализация |
-|----------|------------|
-| Изоляция привилегий | Выделенный системный пользователь `mtproxy` |
-| Защита секретов | Хранилище `/etc/mtproxy/secret` с правами доступа `0600` |
-| Обфускация протокола | Fake TLS с эмуляцией TLS SNI (`ee`-секрет) |
-| Противодействие DPI | Rate-limiting через `iptables hashlimit` |
-| Устойчивость | Сохранение правил через `netfilter-persistent` |
-| Автообновление | Ежедневная синхронизация с серверами Telegram (с валидацией и откатом) |
-| NAT | Автоматическое определение `--nat-info` для облачных окружений |
+---
 
-## Дополнительные параметры
+## Why Not `www.google.com`?
 
-Для большинства случаев параметры указывать не требуется. Значения по умолчанию оптимальны для небольших групп пользователей (до 5 человек).
+Fake TLS impersonates a TLS handshake to a specified domain. If the domain is `google.com` but the server IP doesn't belong to Google, DPI trivially detects the mismatch between SNI and IP ownership — followed by active probing and blocking.
 
-| Аргумент | Описание | Значение по умолчанию |
-|----------|----------|-----------------------|
-| `--domain`, `-D` | Домен для эмуляции TLS SNI | `www.google.com` |
-| `--tag`, `-P` | Тег из @MTProxybot | (опционально) |
-| `--rate-limit` | Лимит новых соединений на IP | `5/min` |
-| `--rate-burst` | Допустимый всплеск | `10` |
+Instead, the installer picks from a list of "neutral" services (Microsoft, Discord CDN, Cloudflare, etc.) and verifies the domain actually serves TLS 1.3. You can supply your own list via `--domain-list`.
 
-Переменные окружения:
+Another factor: TLS traffic on a non-standard port stands out. Use `--port 443` to blend in with regular HTTPS.
 
-| Переменная | Описание | Значение по умолчанию |
-|------------|----------|-----------------------|
-| `FORCE_UNSHARE=auto\|1\|0` | Режим PID namespace workaround: `auto` включает `unshare`, если `pid_max > 65535` или `ns_last_pid > 65535`; `1` включает всегда; `0` отключает | `auto` |
+---
 
-## Workaround для PID > 65535
+## Multi-User Management
 
-На системах с большим `kernel.pid_max` (например `4194304`) MTProxy может падать при старте с assert:
+Each user gets their own secret (`/etc/mtproxy/secrets.d/<name>.secret`). Revoking one user's access doesn't affect others.
+
+```bash
+mtproxy-user.sh add alice     # Create user and get link
+mtproxy-user.sh link alice    # Show link again
+mtproxy-user.sh list          # List all users
+mtproxy-user.sh del alice     # Revoke access
+```
+
+---
+
+## Security Architecture
+
+| Mechanism | Implementation |
+|----------|----------------|
+| Privilege isolation | Dedicated system user `mtproxy` (no login shell, no home) |
+| Secret protection | `/etc/mtproxy/secrets.d` with `0600` permissions |
+| Protocol obfuscation | Fake TLS with auto-selected plausible domain (TLS 1.3 verified) |
+| DPI resistance | `iptables hashlimit` rate-limiting; optional port 443 |
+| Multi-secret | Per-user secrets (`secrets.d`) with granular revocation |
+| systemd hardening | `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, resource limits |
+| Watchdog | systemd timer: 2-min checks, auto-restart on failure |
+| Time sync | NTP via `timesyncd` / `chrony` |
+| Persistence | Firewall rules saved via `netfilter-persistent` |
+| Auto-update | Config daily, binary weekly (with validation + rollback) |
+| NAT | Auto-detection of `--nat-info` for cloud environments |
+
+---
+
+## Options
+
+Defaults are tuned for small groups (up to ~5 users). No flags required for typical use.
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--domain`, `-D` | Domain for Fake TLS SNI | Auto-selected from built-in list (validated) |
+| `--domain-list` | Comma-separated custom domain list for auto-selection | _(optional)_ |
+| `--port` | Port: `auto`, `443` (HTTPS camouflage), or a number | `auto` (random) |
+| `--tag`, `-P` | Tag from [@MTProxybot](https://t.me/MTProxybot) | _(optional)_ |
+| `--rate-limit` | New connection limit per IP | `5/min` |
+| `--rate-burst` | Allowed burst | `10` |
+| `--tune-net` | Network tuning: BBR, buffers, backlog | Disabled |
+| `--ipv6` | Enable IPv6 (`-6`) and show IPv6 link | Disabled |
+
+**Environment variables:**
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `FORCE_UNSHARE=auto\|1\|0` | PID namespace workaround: `auto` enables `unshare` if `pid_max > 65535` or `ns_last_pid > 65535`; `1` always; `0` never | `auto` |
+
+---
+
+## PID > 65535 Workaround
+
+On systems with a large `kernel.pid_max` (e.g. `4194304`), MTProxy may crash on startup:
 
 ```text
 mtproto-proxy: common/pid.c:42: init_common_PID: Assertion `!(p & 0xffff0000)' failed.
 ```
 
-Причина: текущая версия `mtproto-proxy` ожидает PID в 16-битном диапазоне, а systemd может выдать процессу PID больше `65535`.
+**Cause:** `mtproto-proxy` expects a 16-bit PID, but systemd may assign a PID > 65535.
 
-Скрипт автоматически включает локальный workaround через PID namespace (совместимо с Ubuntu 24.04 / systemd 255):
+The installer automatically wraps the binary in a PID namespace (compatible with Ubuntu 24.04 / systemd 255):
 
 ```text
 /usr/bin/unshare --pid --fork --mount-proc -- /opt/MTProxy/objs/bin/mtproto-proxy ...
 ```
 
-Это не меняет глобальные sysctl и не требует контейнеризации. В unit также добавлены:
+This doesn't change global sysctl or require containerization. The unit also includes `StartLimitIntervalSec=60` and `StartLimitBurst=5` to prevent restart storms.
 
-- `StartLimitIntervalSec=60`
-- `StartLimitBurst=5`
+**Verification:**
 
-чтобы ограничить restart-storm при повторных ошибках старта.
+1. `systemctl cat MTProxy` — `ExecStart` should contain `unshare` if the workaround is active.
+2. `journalctl -u MTProxy -f` — MTProxy PIDs typically appear as `[1]`, `[2]`.
+3. `systemctl status MTProxy` — `MainPID` belongs to `unshare`; child `mtproto-proxy` runs in the same cgroup.
 
-Проверка:
+---
 
-1. `systemctl cat MTProxy` — в `ExecStart` должен быть `unshare`, если workaround активирован.
-2. `journalctl -u MTProxy -f` — в логах MTProxy PID обычно видны как `[1]`, `[2]`.
-3. `systemctl status MTProxy` — `MainPID` будет у `unshare`, дочерние `mtproto-proxy` работают в той же cgroup.
-
-## Администрирование
+## Administration
 
 ```bash
-systemctl status MTProxy          # Статус службы
-systemctl restart MTProxy         # Перезапуск
-journalctl -u MTProxy -f          # Журнал в реальном времени
-curl localhost:2398/stats         # Диагностическая статистика
+systemctl status MTProxy          # Service status
+systemctl restart MTProxy         # Restart
+journalctl -u MTProxy -f          # Live logs
+journalctl -t mtproxy-watchdog    # Watchdog logs
+curl localhost:2398/stats         # Diagnostic stats
 ```
 
-## Обновление скрипта
+---
+
+## Updating
 
 ```bash
 cd MTProxy && git pull && sudo bash install_mtproxy.sh
 ```
 
-Повторный запуск сохраняет порт, секрет и домен из текущей конфигурации. Ранее выданные ссылки останутся рабочими.
+Re-running preserves the port, secret, and domain from the current configuration. Previously issued links remain valid.
 
-## Деинсталляция
+---
+
+## Uninstall
 
 ```bash
 sudo bash uninstall_mtproxy.sh
 ```
 
-## Ограничения
+Removes the service, watchdog, cron jobs, firewall rules, user, and all files.
 
-MTProxy проксирует только текстовые сообщения и медиафайлы. Голосовые и видеозвонки через MTProxy не поддерживаются. Для полноценной работы со звонками рекомендуется использовать WireGuard или AmneziaWG с раздельным туннелированием.
+---
 
-## Системные требования
+## Limitations
 
-- Ubuntu 22.04 LTS / 24.04 LTS
-- Доступ с правами root
-- Сетевое подключение к интернету
+MTProxy only proxies text messages and media files. Voice and video calls are **not supported** through MTProxy. For full call functionality, consider [WireGuard](https://www.wireguard.com/) or [AmneziaWG](https://amnezia.org/) with split tunneling.
+
+---
+
+## Requirements
+
+- Ubuntu 22.04 LTS or 24.04 LTS
+- Root access
+- Internet connectivity
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and pull requests are welcome.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for the security policy and architecture details.
+
+## License
+
+[MIT](LICENSE) — (c) 2026 [@ingeniare](https://github.com/ingeniare)

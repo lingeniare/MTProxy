@@ -1,36 +1,36 @@
-# Политика безопасности и техническая реализация
+# Security Policy
 
-## Уведомление об уязвимостях
+## Reporting Vulnerabilities
 
-При обнаружении проблем безопасности, пожалуйста, не используйте публичные системы отслеживания ошибок. Направляйте отчеты напрямую: [@ingeniare](https://github.com/ingeniare)
+If you discover security issues, please do not use public bug trackers. Send reports directly to: [@ingeniare](https://github.com/ingeniare)
 
-## Архитектура безопасности
+## Security Architecture
 
-Данная реализация базируется на следующих принципах и технических мерах:
+This implementation is based on the following principles and technical measures:
 
-### Разграничение прав доступа
-Служба MTProxy исполняется от имени выделенной системной учетной записи `mtproxy`, для которой деактивирована возможность входа в систему (no login shell) и отсутствует домашняя директория. Это минимизирует риски при потенциальной компрометации сервиса.
+### Privilege Separation
+The MTProxy service runs under a dedicated system account `mtproxy` with no login shell and no home directory. This minimizes risk in case of service compromise.
 
-### Изоляция учетных данных
-Операционные секреты хранятся в защищенном файле `/etc/mtproxy/secret` с правами доступа `0600` (чтение и запись только для владельца). Это предотвращает утечку ключей через средства диагностики systemd или файлы конфигурации юнитов.
+### Credential Isolation
+Operational secrets are stored in `/etc/mtproxy/secret` with `0600` permissions (read/write for owner only). This prevents key leakage through systemd diagnostics or unit configuration files. Per-user secrets are stored in `/etc/mtproxy/secrets.d/` with the same permissions.
 
-### Обфускация протокола (Fake TLS)
-Для противодействия системам глубокого анализа трафика (DPI) и эвристическим алгоритмам идентификации реализована поддержка транспорта Fake TLS. Использование секретов формата `ee` и параметра `--domain` позволяет инкапсулировать трафик, имитируя стандартное TLS-рукопожатие с доверенными доменами.
+### Protocol Obfuscation (Fake TLS)
+To counter Deep Packet Inspection (DPI) and heuristic identification systems, Fake TLS transport is supported. Using `ee`-format secrets and the `--domain` parameter, traffic is encapsulated to mimic a standard TLS handshake with trusted domains. The installer auto-selects a plausible domain by verifying DNS resolution and TLS 1.3 support.
 
-### Автоматизированная защита (Rate-Limiting)
-Сценарий установки настраивает правила `iptables` с использованием модуля `hashlimit`. Это обеспечивает ограничение частоты новых TCP-сессий для каждого исходного IP-адреса, снижая видимость сервера для автоматизированных систем сканирования и цензуры (ТСПУ).
+### Automated Protection (Rate-Limiting)
+The installer configures `iptables` rules using the `hashlimit` module. This limits the rate of new TCP sessions per source IP, reducing server visibility to automated scanning and censorship systems.
 
-### Контроль целостности конфигурации
-Процедура автоматического обновления настроек Telegram включает этап валидации. Загружаемые ресурсы проверяются на соответствие минимальному размеру и корректность структуры перед применением. В случае ошибки обновления система сохраняет последнюю стабильную конфигурацию.
+### Configuration Integrity Control
+The automatic Telegram config update process includes a validation step. Downloaded resources are checked for minimum size and structural correctness before being applied. On update failure, the system preserves the last stable configuration.
 
-### Сетевая устойчивость
-Определение внешнего IP-адреса осуществляется через каскад из 8 независимых источников. Сохранность сетевого периметра после перезагрузки узла обеспечивается интеграцией с `netfilter-persistent`.
+### Network Resilience
+External IP detection uses a cascade of 8 independent sources. Firewall rule persistence across reboots is ensured via `netfilter-persistent` integration.
 
-## Рекомендации по эксплуатации
+## Operational Recommendations
 
-1.  **Аутентификация**: Используйте доступ к хосту по SSH-ключам и отключите вход по паролю.
-2.  **Мониторинг**: Регулярно проверяйте журналы службы через `journalctl -u MTProxy` для выявления аномальных паттернов подключений.
-3.  **Защита хоста**: Установите `fail2ban` для защиты интерфейса управления SSH от перебора паролей.
-4.  **Обновления**: Своевременно применяйте патчи безопасности для основной операционной системы.
-5.  **Выбор домена**: В продуктивной среде рекомендуется использовать собственные или специфические домены для эмуляции Fake TLS.
-6.  **Доступ к статистике**: Веб-интерфейс статистики доступен только через loopback-интерфейс (`localhost`). Не открывайте этот порт для внешних сетей.
+1.  **Authentication**: Use SSH key-based access and disable password login.
+2.  **Monitoring**: Regularly check service logs via `journalctl -u MTProxy` for anomalous connection patterns.
+3.  **Host Protection**: Install `fail2ban` to protect the SSH management interface from brute-force attacks.
+4.  **Updates**: Apply security patches for the base OS in a timely manner.
+5.  **Domain Selection**: In production, consider using custom or specific domains for Fake TLS emulation.
+6.  **Stats Access**: The statistics web interface is accessible only via loopback (`localhost`). Do not expose this port to external networks.
