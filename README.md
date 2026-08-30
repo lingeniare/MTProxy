@@ -21,14 +21,15 @@
   <img src="https://img.shields.io/badge/DPI-resistant-00B37E.svg?style=flat-square" alt="DPI"/>
 </p>
 
-<!-- SPONSORS -->
+<p align="center"><b>Спонсоры проекта</b></p>
+
 <table>
 <tr>
 <td align="center" valign="top" width="50%">
 
 <h3>💬 Чат ВЕГА</h3>
 
-Самый многофункциональный AI чат в мире<br/>с бесплатным <b>Автопилотом</b> <i>(chat, web, image)</i>
+Самый многофункциональный AI-чат в мире<br/>с бесплатным <b>Автопилотом</b> — все модели AI,<br/>генерация фото, видео, музыки и сайтов. Персонализированный чат под вас.
 
 <br/><br/>
 <a href="https://vega.chat"><img src="https://img.shields.io/badge/Изучить_ВЕГА-7A5CFA?style=for-the-badge&logo=sparkles&logoColor=white" alt="Изучить ВЕГА"/></a>
@@ -38,7 +39,7 @@
 
 <h3>🔌 API VEGA</h3>
 
-Все endpoint <b>OpenRouter</b>, доступные в России.<br/>Самая полная и функциональная реализация<br/>AI-роутера в России — используйте AI везде, без ограничений.
+Все endpoint <b>OpenRouter</b> в России + каталог<br/><b>MCP, SKILL, приложений</b> и <b>SKILL API VEGA</b><br/>для создания своих AI-приложений без ограничений.
 
 <br/><br/>
 <a href="https://api.vega.chat"><img src="https://img.shields.io/badge/Перейти_к_API-00B37E?style=for-the-badge&logo=rocket&logoColor=white" alt="Перейти к API"/></a>
@@ -234,7 +235,7 @@ MTProxy проксирует только **текстовые сообщени�
 
 <p align="center">
   <b>❤️ Поддержать проект</b><br/>
-  <a href="https://pay.cloudtips.ru/p/772a30a1"><img src="https://img.shields.io/badge/Поддержать_проект-FF5F5F?style=for-the-badge&logo=heart&logoColor=white" alt="Поддержать проект"/></a>
+  <a href="https://buymeacoffee.com/vegaspace" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50" width="210"/></a>
 </p>
 
 <p align="center">
@@ -244,5 +245,5 @@ MTProxy проксирует только **текстовые сообщени�
 </p>
 
 <p align="center">
-  <sub>© 2026 <a href="https://getmyai.io">AI for people and business</a>AI for B2C & B2B</sub>
+  <sub>© 2026 <a href="https://getmyai.io">AI for people and business</a></sub>
 </p>

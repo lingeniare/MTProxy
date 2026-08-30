@@ -21,21 +21,28 @@
   <img src="https://img.shields.io/badge/DPI-resistant-00B37E.svg?style=flat-square" alt="DPI"/>
 </p>
 
-<!-- SPONSOR -->
-<p align="center">
-  <b>Sponsored by</b>
-</p>
+<p align="center"><b>Project Sponsors</b></p>
 
-<table align="center">
+<table>
 <tr>
-<td align="center" valign="top">
+<td align="center" valign="top" width="50%">
 
 <h3>💬 VEGA Chat</h3>
 
-The most versatile AI chat in the world — no subscription,<br/>with free <b>Autopilot</b> <i>(chat, web, image)</i>
+The most versatile AI chat in the world<br/>with free <b>Autopilot</b> — all AI models,<br/>image / video / music & website generation. Personalized for you.
 
 <br/><br/>
 <a href="https://vega.chat"><img src="https://img.shields.io/badge/Explore_vega.chat-7A5CFA?style=for-the-badge&logo=sparkles&logoColor=white" alt="Explore vega.chat"/></a>
+
+</td>
+<td align="center" valign="top" width="50%">
+
+<h3>🔌 VEGA API</h3>
+
+All <b>OpenRouter</b> endpoints in Russia + catalog of<br/><b>MCP, SKILL, apps</b> and <b>VEGA SKILL API</b><br/>to build your own AI apps without limits.
+
+<br/><br/>
+<a href="https://api.vega.chat"><img src="https://img.shields.io/badge/Explore_API-00B37E?style=for-the-badge&logo=rocket&logoColor=white" alt="Explore API"/></a>
 
 </td>
 </tr>
@@ -224,11 +231,8 @@ MTProxy only proxies **text and media**. Voice/video calls are **not supported**
 
 <p align="center">
   <b>☕ Support the project</b><br/>
-  <a href="https://www.buymeacoffee.com/spaceitengw" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50" width="210"/></a>
+  <a href="https://buymeacoffee.com/vegaspace" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50" width="210"/></a>
 </p>
-
-<!-- BuyMeACoffee widget — rendered outside GitHub (GitHub strips <script>) -->
-<script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="spaceitengw" data-color="#FF5F5F" data-emoji="" data-font="Cookie" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#ffffff" data-coffee-color="#FFDD00"></script>
 
 <p align="center">
   <a href="CONTRIBUTING.md">Contributing</a> •
@@ -237,5 +241,5 @@ MTProxy only proxies **text and media**. Voice/video calls are **not supported**
 </p>
 
 <p align="center">
-  <sub>© 2026 <a href="https://getmyai.io">AI for people and business</a>AI for B2B & B2C</sub>
+  <sub>© 2026 <a href="https://getmyai.io">AI for people and business</a></sub>
 </p>
