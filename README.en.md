@@ -50,18 +50,31 @@ All <b>OpenRouter</b> endpoints in Russia + catalog of<br/><b>MCP, SKILL, apps</
 
 ---
 
-## 📑 Contents
+<table>
+<tr>
+<td align="center" valign="top" width="33%">
 
-- [🚀 Quick Start](#-quick-start)
-- [⚙️ What the Installer Does](#️-what-the-installer-does)
-- [🕵️ Why Not `www.google.com`?](#️-why-not-wwwgooglecom)
-- [👥 Multi-User Management](#-multi-user-management)
-- [🛡️ Security Architecture](#️-security-architecture)
-- [🔧 Options](#-options)
-- [🧩 PID > 65535 Workaround](#-pid--65535-workaround)
-- [🖥️ Administration](#️-administration)
-- [🔄 Updating](#-updating)
-- [🗑️ Uninstall](#️-uninstall)
+### � Built from official source
+
+Compiled directly from [Telegram's MTProxy](https://github.com/TelegramMessenger/MTProxy) — no prebuilt binaries, no hidden patches. Fully transparent and auditable.
+
+</td>
+<td align="center" valign="top" width="33%">
+
+### 🧩 Safe on a live server
+
+Isolated `mtproxy` user, dedicated port, no interference with existing services. Install alongside your website, bot or VPN without conflicts.
+
+</td>
+<td align="center" valign="top" width="33%">
+
+### � Set and forget
+
+Watchdog, automatic config & binary updates, `flock` guards and reboot persistence — runs for years with zero manual maintenance.
+
+</td>
+</tr>
+</table>
 
 ---
 
