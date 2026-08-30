@@ -235,7 +235,7 @@ MTProxy проксирует только **текстовые сообщени�
 
 <p align="center">
   <b>❤️ Поддержать проект</b><br/>
-  <a href="https://buymeacoffee.com/vegaspace" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50" width="210"/></a>
+  <a href="https://pay.cloudtips.ru/p/772a30a1"><img src="https://img.shields.io/badge/Поддержать_проект-FF5F5F?style=for-the-badge&logo=heart&logoColor=white" alt="Поддержать проект"/></a>
 </p>
 
 <p align="center">
