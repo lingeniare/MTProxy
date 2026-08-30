@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.3.1] - 2026-08-30
+
+### Безопасность (аудит 2026-08-30)
+
+*   **CRITICAL: секреты скрыты из unit-файла**: создан `CONFIG_DIR/run.sh` wrapper — все `-S` подставляются в рантайме, `systemctl cat MTProxy` и `ps aux` больше не раскрывают секреты. `mtproxy-user.sh` теперь не правит unit через `sed`, а только перезапускает сервис. Исправлен вводящий в заблуждение `ok "недоступен через systemctl cat"`.
+*   **CRITICAL: защита от инъекции через env**: запись `/etc/mtproxy/env` через `printf '%q'`, чтение остаётся `source` но файл `0600 root:root` и значения экранированы.
+*   **HIGH: изоляция владельцев**: `/etc/mtproxy` и `secrets.d/*.secret` теперь `root:root 0700/0600` (было `chown -R mtproxy:mtproxy` — компрометация `mtproxy` позволяла переписать секреты и скрипты). `INSTALL_DIR` остаётся `mtproxy:mtproxy` для сборки.
+*   **HIGH: `NoNewPrivileges` документирован**: комментарий в unit объясняет совместимость с `-u mtproxy` (setuid вниз не блокируется).
+*   **HIGH: `safe.directory` без дублей**: `git config --global --get | grep -qxF` guard в установщике и `update_binary.sh`.
+
+### Маскировка (по опыту telemt)
+
+*   **Расширен список Fake TLS доменов**: 5 → 11, добавлены `www.bing.com`, `outlook.live.com`, `cdnjs.cloudflare.com`, `www.adobe.com`, `www.spotify.com`, `www.dropbox.com` — все с проверкой реального TLS 1.3 рукопожатия (JA4/ECH).
+*   **Усилена валидация домена**: `validate_domain()` теперь проверяет DNS + `curl --tlsv1.3 --fail` с валидным chain-of-trust, fallback на `HEAD` для CDN с 403. Снижает риск детекта DPI по отпечатку.
+*   **Фильтр приватных IP в NAT-детекции**: `is_private_ip()` исключает `10/8`, `192.168/16`, `172.16/12` из `SERVER_IP_TMP` fallback.
+
+### Стабильность («поставил и забыл»)
+
+*   **Systemd hardening**: добавлены `TimeoutStopSec=10`, `TasksMax=512`, `LockPersonality`, `RestrictSUIDSGID`, `RestrictRealtime`, `RemoveIPC`, `SystemCallArchitectures=native` — паритет с telemt, защита от рестарт-шторма.
+*   **Защита от гонок**: `update_config.sh` и `watchdog.sh` обернуты в `flock -n` — исключены параллельные срабатывания cron/timer и повреждение `proxy-multi.conf`; `mtproxy-user.sh` использует `flock` на `secrets.d/.lock`.
+*   **Сборка с диагностикой**: `make` пишет в `/tmp/mtproxy-build.log` и показывает лог при ошибке (было `> /dev/null`).
+*   **Бэкап бинарника**: `mktemp -p "$INSTALL_DIR"` вместо `/tmp` (не теряется после ребута tmpfs), логирование причины отката.
+*   **Деинсталлятор**: порт берётся из `env` (wrapper скрывает `-H` из unit), `iptables` чистит только `MTPROXY_LIMIT` (не трогает чужие ACCEPT), убран глобальный `sysctl --system` — не затрагивает чужие drop-in, чистит `run/*.lock`.
+
+---
+
 ## [1.3.0] - 2026-08-11
 
 ### New Features

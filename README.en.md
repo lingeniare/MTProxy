@@ -1,55 +1,105 @@
-[Русский](README.md) | **English**
+<p align="center">
+  <a href="README.md">Русский</a> &nbsp;|&nbsp; <b>English</b>
+</p>
 
-# MTProxy — Automated Deployment for Ubuntu
+<p align="center">
+  <img src="cover.webp" alt="MTProxy — Telegram Proxy Bypass" width="100%" />
+</p>
 
-> One-command MTProxy server setup with Fake TLS obfuscation, multi-user secrets, watchdog, and DPI resistance. Built for Ubuntu 22.04 / 24.04 LTS.
+<h1 align="center">MTProxy — Automated Deployment for Ubuntu</h1>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform: Ubuntu 22.04 / 24.04](https://img.shields.io/badge/Platform-Ubuntu%2022.04%20%2F%2024.04-E95420.svg)](https://ubuntu.com/)
-[![Version: 1.3.0](https://img.shields.io/badge/Version-1.3.0-success.svg)](CHANGELOG.md)
+<p align="center">
+  One-command MTProxy setup on <b>Ubuntu 22.04 / 24.04 LTS</b> with Fake TLS obfuscation,<br/>
+  multi-user secrets, watchdog & DPI resistance
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT"/></a>
+  <a href="https://ubuntu.com/"><img src="https://img.shields.io/badge/Platform-Ubuntu%2022.04%20%2F%2024.04-E95420.svg?style=flat-square&logo=ubuntu&logoColor=white" alt="Platform"/></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Version-1.3.1-success.svg?style=flat-square" alt="Version"/></a>
+  <img src="https://img.shields.io/badge/FakeTLS-TLS%201.3-7A5CFA.svg?style=flat-square" alt="FakeTLS"/>
+  <img src="https://img.shields.io/badge/DPI-resistant-00B37E.svg?style=flat-square" alt="DPI"/>
+</p>
+
+<!-- SPONSOR -->
+<p align="center">
+  <b>Sponsored by</b>
+</p>
+
+<table align="center">
+<tr>
+<td align="center" valign="top">
+
+<h3>💬 VEGA Chat</h3>
+
+The most versatile AI chat in the world — no subscription,<br/>with free <b>Autopilot</b> <i>(chat, web, image)</i>
+
+<br/><br/>
+<a href="https://vega.chat"><img src="https://img.shields.io/badge/Explore_vega.chat-7A5CFA?style=for-the-badge&logo=sparkles&logoColor=white" alt="Explore vega.chat"/></a>
+
+</td>
+</tr>
+</table>
 
 ---
 
-## Quick Start
+## 📑 Contents
+
+- [🚀 Quick Start](#-quick-start)
+- [⚙️ What the Installer Does](#️-what-the-installer-does)
+- [🕵️ Why Not `www.google.com`?](#️-why-not-wwwgooglecom)
+- [👥 Multi-User Management](#-multi-user-management)
+- [🛡️ Security Architecture](#️-security-architecture)
+- [🔧 Options](#-options)
+- [🧩 PID > 65535 Workaround](#-pid--65535-workaround)
+- [🖥️ Administration](#️-administration)
+- [🔄 Updating](#-updating)
+- [🗑️ Uninstall](#️-uninstall)
+
+---
+
+## 🚀 Quick Start
 
 ```bash
 git clone https://github.com/lingeniare/MTProxy.git && cd MTProxy && sudo bash install_mtproxy.sh
 ```
 
-That's it. The script prints a ready-to-use `tg://proxy?...` link at the end — open it on your phone and Telegram connects automatically.
+> That's it. The script prints a ready-to-use `tg://proxy?...` link and a **QR code** — open it on your phone and Telegram connects automatically.
 
 ---
 
-## What the Installer Does
+## ⚙️ What the Installer Does
 
-1. Installs system dependencies (including `cron` if missing).
-2. Configures NTP time sync — clock drift breaks the MTProto handshake.
-3. Creates an isolated system user `mtproxy`.
-4. Compiles MTProxy from the [official Telegram source](https://github.com/TelegramMessenger/MTProxy).
-5. Downloads and validates Telegram configuration files.
-6. Picks a plausible Fake TLS domain (verifies DNS + TLS 1.3) and generates secrets.
-7. Auto-detects NAT for cloud VPS environments.
-8. Registers a hardened systemd service with auto-restart and restart-storm limiting.
-9. Sets up a watchdog: health check every 2 minutes, automatic restart on failure.
-10. Configures per-IP connection rate limiting via `iptables`.
-11. Schedules cron jobs: daily config refresh + weekly binary update (with rollback).
-12. Opens the firewall port and persists rules across reboots.
-
----
-
-## Why Not `www.google.com`?
-
-Fake TLS impersonates a TLS handshake to a specified domain. If the domain is `google.com` but the server IP doesn't belong to Google, DPI trivially detects the mismatch between SNI and IP ownership — followed by active probing and blocking.
-
-Instead, the installer picks from a list of "neutral" services (Microsoft, Discord CDN, Cloudflare, etc.) and verifies the domain actually serves TLS 1.3. You can supply your own list via `--domain-list`.
-
-Another factor: TLS traffic on a non-standard port stands out. Use `--port 443` to blend in with regular HTTPS.
+| # | Action |
+|---|--------|
+| 1 | Installs system dependencies (including `cron` if missing) |
+| 2 | Configures NTP time sync — clock drift breaks the MTProto handshake |
+| 3 | Creates an isolated system user `mtproxy` |
+| 4 | Compiles MTProxy from the [official Telegram source](https://github.com/TelegramMessenger/MTProxy) |
+| 5 | Downloads and validates Telegram configuration files |
+| 6 | Picks a plausible Fake TLS domain from 11 neutral candidates (DNS + TLS 1.3 with valid cert, JA4/ECH-aware) and generates secrets |
+| 7 | Auto-detects NAT for cloud VPS environments |
+| 8 | Registers a hardened systemd service via wrapper `/etc/mtproxy/run.sh` (secrets never hit the unit) with extended hardening and restart-storm limiting |
+| 9 | Sets up a **watchdog**: health check every 2 min with `flock`, auto-restart after 3 consecutive failures |
+| 10 | Configures per-IP connection rate limiting via `iptables` |
+| 11 | Schedules cron jobs: daily config refresh + weekly binary update (with `flock`, validation, rollback, backup in `$INSTALL_DIR`) |
+| 12 | Opens the firewall port and persists rules across reboots |
 
 ---
 
-## Multi-User Management
+## 🕵️ Why Not `www.google.com`?
 
-Each user gets their own secret (`/etc/mtproxy/secrets.d/<name>.secret`). Revoking one user's access doesn't affect others.
+Fake TLS impersonates a TLS handshake to a specified domain. If the domain is `google.com` but the server IP doesn't belong to Google, DPI trivially detects the mismatch between **SNI ↔ IP ownership** (JA4/ECH) — followed by active probing and blocking.
+
+Instead, the installer picks from **11 neutral services** (Microsoft, Discord CDN, Cloudflare, Bing, Adobe, Spotify, Dropbox, etc.) and verifies `DNS + TLS 1.3` with a valid chain-of-trust (`curl --tlsv1.3 --fail`, HEAD fallback for CDNs) — JA4/ECH-aware. Supply your own list via `--domain-list`.
+
+> 💡 **Port is also camouflage.** TLS on a non-standard port stands out. Use `--port 443` to blend in with regular HTTPS.
+
+---
+
+## 👥 Multi-User Management
+
+> Each user gets their own secret `(/etc/mtproxy/secrets.d/<name>.secret)`. Revoking one doesn't affect others.
 
 ```bash
 mtproxy-user.sh add alice     # Create user and get link
@@ -60,33 +110,33 @@ mtproxy-user.sh del alice     # Revoke access
 
 ---
 
-## Security Architecture
+## 🛡️ Security Architecture
 
 | Mechanism | Implementation |
-|----------|----------------|
-| Privilege isolation | Dedicated system user `mtproxy` (no login shell, no home) |
-| Secret protection | `/etc/mtproxy/secrets.d` with `0600` permissions |
-| Protocol obfuscation | Fake TLS with auto-selected plausible domain (TLS 1.3 verified) |
-| DPI resistance | `iptables hashlimit` rate-limiting; optional port 443 |
-| Multi-secret | Per-user secrets (`secrets.d`) with granular revocation |
-| systemd hardening | `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, resource limits |
-| Watchdog | systemd timer: 2-min checks, auto-restart on failure |
-| Time sync | NTP via `timesyncd` / `chrony` |
-| Persistence | Firewall rules saved via `netfilter-persistent` |
-| Auto-update | Config daily, binary weekly (with validation + rollback) |
-| NAT | Auto-detection of `--nat-info` for cloud environments |
+|-----------|----------------|
+| **Privilege isolation** | Dedicated system user `mtproxy` (no login shell, no home) |
+| **Secret protection** | `/etc/mtproxy/secrets.d` (`0600`, `root:root`) + wrapper `/etc/mtproxy/run.sh` — secrets injected at runtime |
+| **Protocol obfuscation** | Fake TLS with auto-selection from 11 domains (DNS + TLS 1.3 + valid cert, JA4/ECH) |
+| **DPI resistance** | `iptables hashlimit` rate-limiting; optional port `443` |
+| **Multi-secret** | Per-user secrets (`secrets.d`) with granular revocation |
+| **systemd hardening** | `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, `LockPersonality`, `RestrictSUIDSGID`, `RemoveIPC`, `SystemCallArchitectures=native`, `TasksMax`/`MemoryMax` |
+| **Watchdog** | systemd timer: 2-min checks with `flock`, auto-restart after 3 failures |
+| **Time sync** | NTP via `timesyncd` / `chrony` |
+| **Persistence** | Firewall rules saved via `netfilter-persistent` |
+| **Auto-update** | Config daily, binary weekly (with `flock`, validation + rollback) |
+| **NAT** | Auto-detection of `--nat-info` for cloud environments |
 
 ---
 
-## Options
+## 🔧 Options
 
 Defaults are tuned for small groups (up to ~5 users). No flags required for typical use.
 
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--domain`, `-D` | Domain for Fake TLS SNI | Auto-selected from built-in list (validated) |
-| `--domain-list` | Comma-separated custom domain list for auto-selection | _(optional)_ |
-| `--port` | Port: `auto`, `443` (HTTPS camouflage), or a number | `auto` (random) |
+| `--domain-list` | Comma-separated custom domain list | _(optional)_ |
+| `--port` | Port: `auto`, `443` (HTTPS camouflage), or number | `auto` (random) |
 | `--tag`, `-P` | Tag from [@MTProxybot](https://t.me/MTProxybot) | _(optional)_ |
 | `--rate-limit` | New connection limit per IP | `5/min` |
 | `--rate-burst` | Allowed burst | `10` |
@@ -97,37 +147,36 @@ Defaults are tuned for small groups (up to ~5 users). No flags required for typi
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `FORCE_UNSHARE=auto\|1\|0` | PID namespace workaround: `auto` enables `unshare` if `pid_max > 65535` or `ns_last_pid > 65535`; `1` always; `0` never | `auto` |
+| `FORCE_UNSHARE=auto\|1\|0` | PID namespace workaround | `auto` |
 
 ---
 
-## PID > 65535 Workaround
+## 🧩 PID > 65535 Workaround
 
-On systems with a large `kernel.pid_max` (e.g. `4194304`), MTProxy may crash on startup:
+On systems with large `kernel.pid_max` (e.g. `4194304`), MTProxy may crash:
 
 ```text
 mtproto-proxy: common/pid.c:42: init_common_PID: Assertion `!(p & 0xffff0000)' failed.
 ```
 
-**Cause:** `mtproto-proxy` expects a 16-bit PID, but systemd may assign a PID > 65535.
-
-The installer automatically wraps the binary in a PID namespace (compatible with Ubuntu 24.04 / systemd 255):
+The installer wraps the binary in a PID namespace (Ubuntu 24.04 / systemd 255 compatible):
 
 ```text
 /usr/bin/unshare --pid --fork --mount-proc -- /opt/MTProxy/objs/bin/mtproto-proxy ...
 ```
 
-This doesn't change global sysctl or require containerization. The unit also includes `StartLimitIntervalSec=60` and `StartLimitBurst=5` to prevent restart storms.
+<details>
+<summary><b>Verify the workaround</b></summary>
 
-**Verification:**
+1. `systemctl cat MTProxy` — `ExecStart` should be `/etc/mtproxy/run.sh` (prefixed with `unshare` if active).
+2. `journalctl -u MTProxy -f` — PIDs appear as `[1]`, `[2]`.
+3. `systemctl status MTProxy` — `MainPID` belongs to `unshare`/`run.sh`.
 
-1. `systemctl cat MTProxy` — `ExecStart` should contain `unshare` if the workaround is active.
-2. `journalctl -u MTProxy -f` — MTProxy PIDs typically appear as `[1]`, `[2]`.
-3. `systemctl status MTProxy` — `MainPID` belongs to `unshare`; child `mtproto-proxy` runs in the same cgroup.
+</details>
 
 ---
 
-## Administration
+## 🖥️ Administration
 
 ```bash
 systemctl status MTProxy          # Service status
@@ -139,48 +188,54 @@ curl localhost:2398/stats         # Diagnostic stats
 
 ---
 
-## Updating
+## 🔄 Updating
 
 ```bash
 cd MTProxy && git pull && sudo bash install_mtproxy.sh
 ```
 
-Re-running preserves the port, secret, and domain from the current configuration. Previously issued links remain valid.
+Re-running preserves port, secret, and domain. Previous links remain valid.
 
 ---
 
-## Uninstall
+## 🗑️ Uninstall
 
 ```bash
 sudo bash uninstall_mtproxy.sh
 ```
 
-Removes the service, watchdog, cron jobs, firewall rules, user, and all files.
+Removes service, watchdog, cron jobs, firewall rules, user, and all files.
 
 ---
 
-## Limitations
+## ⚠️ Limitations
 
-MTProxy only proxies text messages and media files. Voice and video calls are **not supported** through MTProxy. For full call functionality, consider [WireGuard](https://www.wireguard.com/) or [AmneziaWG](https://amnezia.org/) with split tunneling.
+MTProxy only proxies **text and media**. Voice/video calls are **not supported**. For calls use [WireGuard](https://www.wireguard.com/) or [AmneziaWG](https://amnezia.org/) with split tunneling.
 
 ---
 
-## Requirements
+## 📋 Requirements
 
-- Ubuntu 22.04 LTS or 24.04 LTS
+- Ubuntu 22.04 LTS / 24.04 LTS
 - Root access
 - Internet connectivity
 
 ---
 
-## Contributing
+<p align="center">
+  <b>☕ Support the project</b><br/>
+  <a href="https://www.buymeacoffee.com/spaceitengw" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50" width="210"/></a>
+</p>
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and pull requests are welcome.
+<!-- BuyMeACoffee widget — rendered outside GitHub (GitHub strips <script>) -->
+<script type="text/javascript" src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js" data-name="bmc-button" data-slug="spaceitengw" data-color="#FF5F5F" data-emoji="" data-font="Cookie" data-text="Buy me a coffee" data-outline-color="#000000" data-font-color="#ffffff" data-coffee-color="#FFDD00"></script>
 
-## Security
+<p align="center">
+  <a href="CONTRIBUTING.md">Contributing</a> •
+  <a href="SECURITY.md">Security</a> •
+  <a href="LICENSE">MIT License</a>
+</p>
 
-See [SECURITY.md](SECURITY.md) for the security policy and architecture details.
-
-## License
-
-[MIT](LICENSE) — (c) 2026 [@ingeniare](https://github.com/ingeniare)
+<p align="center">
+  <sub>© 2026 <a href="https://getmyai.io">AI for people and business</a>AI for B2B & B2C</sub>
+</p>

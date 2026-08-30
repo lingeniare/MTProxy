@@ -15,8 +15,16 @@ CONFIG_DIR="/etc/mtproxy"
 PORT=""
 
 # --- Остановка и удаление сервиса ---
-if [[ -f "$SERVICE_FILE" ]]; then
+# Порт берём из env (wrapper скрывает -H из unit), fallback — разбор unit
+if [[ -f "$CONFIG_DIR/env" ]]; then
+  # shellcheck disable=SC1091
+  source "$CONFIG_DIR/env" 2>/dev/null || true
+  PORT="${PROXY_PORT:-}"
+fi
+if [[ -z "$PORT" && -f "$SERVICE_FILE" ]]; then
   PORT=$(awk '/-H/ {for(i=1;i<=NF;i++) if($i=="-H") {print $(i+1); exit}}' "$SERVICE_FILE" || true)
+fi
+if [[ -f "$SERVICE_FILE" ]]; then
   systemctl stop MTProxy.service >/dev/null 2>&1 || true
   systemctl disable MTProxy.service >/dev/null 2>&1 || true
   rm -f "$SERVICE_FILE"
@@ -49,9 +57,8 @@ if [[ -n "$PORT" ]]; then
     firewall-cmd --reload >/dev/null 2>&1 || true
   fi
 
-  # Удаление правил rate-limiting
+  # Удаление правил rate-limiting (точный --dport, не трогаем чужие ACCEPT)
   if command -v iptables >/dev/null 2>&1; then
-    iptables -D INPUT -p tcp --dport "$PORT" -j ACCEPT >/dev/null 2>&1 || true
     iptables -D INPUT -p tcp --dport "$PORT" -m conntrack --ctstate NEW -j MTPROXY_LIMIT >/dev/null 2>&1 || true
     iptables -F MTPROXY_LIMIT >/dev/null 2>&1 || true
     iptables -X MTPROXY_LIMIT >/dev/null 2>&1 || true
@@ -71,10 +78,12 @@ fi
 # --- Удаление файлов и конфигураций ---
 rm -rf "$INSTALL_DIR"
 rm -rf "$CONFIG_DIR"
+# Удаляем sysctl drop-in без глобального sysctl --system (не трогаем чужие настройки)
 rm -f /etc/sysctl.d/90-mtproxy.conf
 rm -f /etc/systemd/journald.conf.d/90-mtproxy.conf
-rm -f /run/mtproxy-watchdog.fails
-sysctl --system >/dev/null 2>&1 || true
+rm -f /run/mtproxy-watchdog.fails /run/mtproxy-update.lock /run/mtproxy-watchdog.lock
+rm -f /tmp/mtproxy-build.log
+systemctl restart systemd-journald >/dev/null 2>&1 || true
 echo "[OK] Файлы, sysctl и journald drop-in удалены"
 
 echo ""

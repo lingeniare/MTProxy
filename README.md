@@ -1,54 +1,111 @@
-**Русский** | [English](README.en.md)
+<p align="center">
+  <a href="README.en.md">English</a> &nbsp;|&nbsp; <b>Русский</b>
+</p>
 
-# Сценарий развертывания MTProxy
+<p align="center">
+  <img src="cover.webp" alt="MTProxy — обход блокировок Telegram" width="100%" />
+</p>
 
-> Автоматизированная установка MTProxy на Ubuntu 22.04/24.04 LTS с Fake TLS обфускацией, мультисекретами пользователей, watchdog и защитой от DPI.
+<h1 align="center">Сценарий развертывания MTProxy</h1>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform: Ubuntu 22.04 / 24.04](https://img.shields.io/badge/Platform-Ubuntu%2022.04%20%2F%2024.04-E95420.svg)](https://ubuntu.com/)
-[![Version: 1.3.0](https://img.shields.io/badge/Version-1.3.0-success.svg)](CHANGELOG.md)
+<p align="center">
+  Автоматизированная установка MTProxy на <b>Ubuntu 22.04 / 24.04 LTS</b> с Fake TLS обфускацией,<br/>
+  мультисекретами пользователей, watchdog и защитой от DPI
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT"/></a>
+  <a href="https://ubuntu.com/"><img src="https://img.shields.io/badge/Platform-Ubuntu%2022.04%20%2F%2024.04-E95420.svg?style=flat-square&logo=ubuntu&logoColor=white" alt="Platform"/></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Version-1.3.1-success.svg?style=flat-square" alt="Version"/></a>
+  <img src="https://img.shields.io/badge/FakeTLS-TLS%201.3-7A5CFA.svg?style=flat-square" alt="FakeTLS"/>
+  <img src="https://img.shields.io/badge/DPI-resistant-00B37E.svg?style=flat-square" alt="DPI"/>
+</p>
+
+<!-- SPONSORS -->
+<table>
+<tr>
+<td align="center" valign="top" width="50%">
+
+<h3>💬 Чат ВЕГА</h3>
+
+Самый многофункциональный AI чат в мире<br/>с бесплатным <b>Автопилотом</b> <i>(chat, web, image)</i>
+
+<br/><br/>
+<a href="https://vega.chat"><img src="https://img.shields.io/badge/Изучить_ВЕГА-7A5CFA?style=for-the-badge&logo=sparkles&logoColor=white" alt="Изучить ВЕГА"/></a>
+
+</td>
+<td align="center" valign="top" width="50%">
+
+<h3>🔌 API VEGA</h3>
+
+Все endpoint <b>OpenRouter</b>, доступные в России.<br/>Самая полная и функциональная реализация<br/>AI-роутера в России — используйте AI везде, без ограничений.
+
+<br/><br/>
+<a href="https://api.vega.chat"><img src="https://img.shields.io/badge/Перейти_к_API-00B37E?style=for-the-badge&logo=rocket&logoColor=white" alt="Перейти к API"/></a>
+
+</td>
+</tr>
+</table>
 
 ---
 
-## Быстрый старт
+## 📑 Оглавление
+
+- [🚀 Быстрый старт](#-быстрый-старт)
+- [⚙️ Что выполняет сценарий](#️-что-выполняет-сценарий)
+- [🕵️ Почему не `www.google.com`?](#️-почему-не-wwwgooglecom)
+- [👥 Управление пользователями](#-управление-пользователями)
+- [🛡️ Архитектура безопасности](#️-архитектура-безопасности)
+- [🔧 Дополнительные параметры](#-дополнительные-параметры)
+- [🧩 Workaround для PID > 65535](#-workaround-для-pid--65535)
+- [🖥️ Администрирование](#️-администрирование)
+- [🔄 Обновление скрипта](#-обновление-скрипта)
+- [🗑️ Деинсталляция](#️-деинсталляция)
+
+---
+
+## 🚀 Быстрый старт
 
 ```bash
 git clone https://github.com/lingeniare/MTProxy.git && cd MTProxy && sudo bash install_mtproxy.sh
 ```
 
-После завершения скрипт выведет готовую ссылку и QR-код для подключения. 
-Откройте её на телефоне — Telegram подхватит прокси автоматически.
+> После завершения скрипт выведет готовую ссылку `tg://proxy?...` и **QR-код**.<br/>Откройте ссылку на телефоне — Telegram подхватит прокси автоматически.
 
 ---
 
-## Что выполняет сценарий
+## ⚙️ Что выполняет сценарий
 
-1. Устанавливает системные зависимости (включая cron, если отсутствует).
-2. Настраивает синхронизацию времени (NTP) — сдвиг часов ломает MTProto-рукопожатие.
-3. Создает изолированного системного пользователя `mtproxy`.
-4. Компилирует MTProxy из [официального репозитория Telegram](https://github.com/TelegramMessenger/MTProxy).
-5. Загружает и валидирует конфигурационные файлы Telegram.
-6. Подбирает правдоподобный домен для Fake TLS (с проверкой DNS и TLS 1.3) и генерирует секреты.
-7. Автоматически определяет NAT-конфигурацию для облачных VPS.
-8. Регистрирует systemd-сервис с автозапуском, hardening-директивами и ограничением restart-storm.
-9. Настраивает watchdog: проверка каждые 2 минуты, автоматический перезапуск при сбое.
-10. Настраивает ограничение частоты соединений через iptables.
-11. Создает задания планировщика: ежедневное обновление конфигурации Telegram и еженедельное обновление бинарника (с откатом).
-12. Открывает порт в межсетном экране и сохраняет правила на случай перезагрузки.
-
----
-
-## Почему не `www.google.com`?
-
-Fake TLS подделывает TLS-рукопожатие под указанный домен. Если домен — `google.com`, а IP сервера не принадлежит Google, DPI тривиально выявляет подмену по несовпадению SNI и владельца адреса: следом идёт активное зондирование и блокировка. Поэтому установщик выбирает домен из списка «нейтральных» сервисов (Microsoft, Discord CDN, Cloudflare и т.п.), проверяя, что домен реально обслуживает TLS 1.3. Свой список можно задать через `--domain-list`.
-
-Дополнительный фактор маскировки — порт: TLS-трафик на нестандартном порту выделяется из фона. Флаг `--port 443` маскирует прокси под обычный HTTPS.
+| # | Действие |
+|---|----------|
+| 1 | Устанавливает системные зависимости (включая `cron`, если отсутствует) |
+| 2 | Настраивает синхронизацию времени (NTP) — сдвиг часов ломает MTProto-рукопожатие |
+| 3 | Создает изолированного системного пользователя `mtproxy` |
+| 4 | Компилирует MTProxy из [официального репозитория Telegram](https://github.com/TelegramMessenger/MTProxy) |
+| 5 | Загружает и валидирует конфигурационные файлы Telegram |
+| 6 | Подбирает правдоподобный домен для Fake TLS из 11 «нейтральных» (проверка DNS + TLS 1.3 с валидным сертификатом, с учётом JA4/ECH) и генерирует секреты |
+| 7 | Автоматически определяет NAT-конфигурацию для облачных VPS |
+| 8 | Регистрирует systemd-сервис через wrapper `/etc/mtproxy/run.sh` (секреты не попадают в unit) с автозапуском, расширенным hardening и ограничением restart-storm |
+| 9 | Настраивает **watchdog**: проверка каждые 2 минуты с защитой `flock` и автоперезапуском при 3 неудачах подряд |
+| 10 | Настраивает ограничение частоты соединений через `iptables` |
+| 11 | Создает задания планировщика: ежедневное обновление конфигурации Telegram и еженедельное обновление бинарника (с `flock`, валидацией и откатом, бэкап в `$INSTALL_DIR`) |
+| 12 | Открывает порт в межсетном экране и сохраняет правила на случай перезагрузки |
 
 ---
 
-## Управление пользователями
+## 🕵️ Почему не `www.google.com`?
 
-У каждого пользователя — собственный секрет (`/etc/mtproxy/secrets.d/<имя>.secret`). Отзыв доступа одного пользователя не затрагивает остальных.
+Fake TLS подделывает TLS-рукопожатие под указанный домен. Если домен — `google.com`, а IP сервера не принадлежит Google, DPI тривиально выявляет подмену по несовпадению **SNI ↔ владелец адреса** (проверка JA4/ECH) — следом идёт активное зондирование и блокировка.
+
+Поэтому установщик выбирает домен из **11 «нейтральных» сервисов** (Microsoft, Discord CDN, Cloudflare, Bing, Adobe, Spotify, Dropbox и др.), проверяя `DNS + TLS 1.3` с валидным chain-of-trust (`curl --tlsv1.3 --fail`, fallback HEAD для CDN). Свой список можно задать через `--domain-list`.
+
+> 💡 **Порт тоже маскировка.** TLS-трафик на нестандартном порту выделяется из фона. Флаг `--port 443` маскирует прокси под обычный HTTPS.
+
+---
+
+## 👥 Управление пользователями
+
+> У каждого пользователя — собственный секрет `(/etc/mtproxy/secrets.d/<имя>.secret)`. Отзыв доступа одного не затрагивает остальных.
 
 ```bash
 mtproxy-user.sh add alice     # создать пользователя и получить ссылку
@@ -59,91 +116,89 @@ mtproxy-user.sh del alice     # отозвать доступ
 
 ---
 
-## Архитектура безопасности
+## 🛡️ Архитектура безопасности
 
 | Механизм | Реализация |
 |----------|------------|
-| Изоляция привилегий | Выделенный системный пользователь `mtproxy` (без shell, без home) |
-| Защита секретов | Хранилище `/etc/mtproxy/secrets.d` с правами доступа `0600` |
-| Обфускация протокола | Fake TLS с автовыбором правдоподобного домена (проверка TLS 1.3) |
-| Противодействие DPI | Rate-limiting через `iptables hashlimit`; опция порта 443 |
-| Мультисекреты | Отдельный секрет на пользователя (`secrets.d`), точечный отзыв доступа |
-| Hardening | `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, лимиты ресурсов |
-| Watchdog | systemd timer: проверка каждые 2 мин, автоперезапуск при сбое |
-| Время | NTP-синхронизация (timesyncd/chrony) |
-| Устойчивость | Сохранение правил через `netfilter-persistent` |
-| Автообновление | Конфиг — ежедневно, бинарник — еженедельно (с валидацией и откатом) |
-| NAT | Автоматическое определение `--nat-info` для облачных окружений |
+| **Изоляция привилегий** | Выделенный системный пользователь `mtproxy` (без shell, без home) |
+| **Защита секретов** | `/etc/mtproxy/secrets.d` (`0600`, `root:root`) + wrapper `/etc/mtproxy/run.sh` — секреты подставляются в рантайме, не видны через `systemctl cat` / `ps` |
+| **Обфускация протокола** | Fake TLS с автовыбором из 11 доменов (DNS + TLS 1.3 + валидный сертификат, JA4/ECH) |
+| **Противодействие DPI** | Rate-limiting `iptables hashlimit`; опция порта `443` |
+| **Мультисекреты** | Отдельный секрет на пользователя (`secrets.d`), точечный отзыв доступа |
+| **Hardening** | `NoNewPrivileges`, `ProtectSystem=strict`, `PrivateTmp`, `LockPersonality`, `RestrictSUIDSGID`, `RemoveIPC`, `SystemCallArchitectures=native`, лимиты `TasksMax`/`MemoryMax` |
+| **Watchdog** | systemd timer: проверка каждые 2 мин с `flock`, автоперезапуск после 3 неудач |
+| **Время** | NTP-синхронизация (timesyncd/chrony) |
+| **Устойчивость** | Сохранение правил через `netfilter-persistent` |
+| **Автообновление** | Конфиг — ежедневно, бинарник — еженедельно (с `flock`, валидацией и откатом) |
+| **NAT** | Автоматическое определение `--nat-info` для облачных окружений |
 
 ---
 
-## Дополнительные параметры
+## 🔧 Дополнительные параметры
 
-Для большинства случаев параметры указывать не требуется. Значения по умолчанию оптимальны для небольших групп пользователей (до 5 человек).
+> Для большинства случаев параметры указывать не требуется. Значения по умолчанию оптимальны для небольших групп (до 5 человек).
 
-| Аргумент | Описание | Значение по умолчанию |
-|----------|----------|-----------------------|
+| Аргумент | Описание | По умолчанию |
+|----------|----------|--------------|
 | `--domain`, `-D` | Домен для эмуляции TLS SNI | автовыбор из встроенного списка с валидацией |
-| `--domain-list` | Свой список доменов через запятую для автовыбора | (опционально) |
+| `--domain-list` | Свой список доменов через запятую для автовыбора | _(опционально)_ |
 | `--port` | Порт: `auto`, `443` (маскировка под HTTPS) или номер | `auto` (случайный) |
-| `--tag`, `-P` | Тег из [@MTProxybot](https://t.me/MTProxybot) | (опционально) |
+| `--tag`, `-P` | Тег из [@MTProxybot](https://t.me/MTProxybot) | _(опционально)_ |
 | `--rate-limit` | Лимит новых соединений на IP | `5/min` |
 | `--rate-burst` | Допустимый всплеск | `10` |
-| `--tune-net` | Сетевой тюнинг sysctl: BBR, буферы, backlog | выключен |
-| `--ipv6` | Включить поддержку IPv6 (`-6`) и вывести IPv6-ссылку | выключен |
+| `--tune-net` | Сетевой тюнинг sysctl: BBR, буферы, backlog | выкл |
+| `--ipv6` | Включить поддержку IPv6 (`-6`) и вывести IPv6-ссылку | выкл |
 
-Переменные окружения:
+**Переменные окружения:**
 
-| Переменная | Описание | Значение по умолчанию |
-|------------|----------|-----------------------|
+| Переменная | Описание | По умолчанию |
+|------------|----------|--------------|
 | `FORCE_UNSHARE=auto\|1\|0` | Режим PID namespace workaround: `auto` включает `unshare`, если `pid_max > 65535` или `ns_last_pid > 65535`; `1` включает всегда; `0` отключает | `auto` |
 
 ---
 
-## Workaround для PID > 65535
+## 🧩 Workaround для PID > 65535
 
-На системах с большим `kernel.pid_max` (например `4194304`) MTProxy может падать при старте с assert:
+На системах с большим `kernel.pid_max` (например `4194304`) MTProxy может падать при старте:
 
 ```text
 mtproto-proxy: common/pid.c:42: init_common_PID: Assertion `!(p & 0xffff0000)' failed.
 ```
 
-Причина: текущая версия `mtproto-proxy` ожидает PID в 16-битном диапазоне, а systemd может выдать процессу PID больше `65535`.
+**Причина:** текущая версия `mtproto-proxy` ожидает PID в 16-битном диапазоне, а systemd может выдать PID > `65535`.
 
-Скрипт автоматически включает локальный workaround через PID namespace (совместимо с Ubuntu 24.04 / systemd 255):
+Скрипт автоматически включает workaround через PID namespace (совместимо с Ubuntu 24.04 / systemd 255):
 
 ```text
 /usr/bin/unshare --pid --fork --mount-proc -- /opt/MTProxy/objs/bin/mtproto-proxy ...
 ```
 
-Это не меняет глобальные sysctl и не требует контейнеризации. В unit также добавлены:
+Дополнительно в unit добавлены `StartLimitIntervalSec=60` и `StartLimitBurst=5` против restart-storm.
 
-- `StartLimitIntervalSec=60`
-- `StartLimitBurst=5`
+<details>
+<summary><b>Как проверить, что workaround активен</b></summary>
 
-чтобы ограничить restart-storm при повторных ошибках старта.
+1. `systemctl cat MTProxy` — в `ExecStart` должен быть `/etc/mtproxy/run.sh` (с префиксом `unshare`, если активен); секреты (`-S`) не показываются.
+2. `journalctl -u MTProxy -f` — в логах PID обычно как `[1]`, `[2]`.
+3. `systemctl status MTProxy` — `MainPID` будет у `unshare`/`run.sh`, дочерние `mtproto-proxy` работают в той же cgroup.
 
-Проверка:
-
-1. `systemctl cat MTProxy` — в `ExecStart` должен быть `unshare`, если workaround активирован.
-2. `journalctl -u MTProxy -f` — в логах MTProxy PID обычно видны как `[1]`, `[2]`.
-3. `systemctl status MTProxy` — `MainPID` будет у `unshare`, дочерние `mtproto-proxy` работают в той же cgroup.
+</details>
 
 ---
 
-## Администрирование
+## 🖥️ Администрирование
 
 ```bash
-systemctl status MTProxy          # Статус службы
-systemctl restart MTProxy         # Перезапуск
-journalctl -u MTProxy -f          # Журнал в реальном времени
-journalctl -t mtproxy-watchdog    # Журнал watchdog
-curl localhost:2398/stats         # Диагностическая статистика
+systemctl status MTProxy          # статус службы
+systemctl restart MTProxy         # перезапуск
+journalctl -u MTProxy -f          # журнал в реальном времени
+journalctl -t mtproxy-watchdog    # журнал watchdog
+curl localhost:2398/stats         # диагностическая статистика
 ```
 
 ---
 
-## Обновление скрипта
+## 🔄 Обновление скрипта
 
 ```bash
 cd MTProxy && git pull && sudo bash install_mtproxy.sh
@@ -153,7 +208,7 @@ cd MTProxy && git pull && sudo bash install_mtproxy.sh
 
 ---
 
-## Деинсталляция
+## 🗑️ Деинсталляция
 
 ```bash
 sudo bash uninstall_mtproxy.sh
@@ -163,28 +218,31 @@ sudo bash uninstall_mtproxy.sh
 
 ---
 
-## Ограничения
+## ⚠️ Ограничения
 
-MTProxy проксирует только текстовые сообщения и медиафайлы. Голосовые и видеозвонки **не поддерживаются**. Для полноценной работы со звонками рекомендуется использовать [WireGuard](https://www.wireguard.com/) или [AmneziaWG](https://amnezia.org/) с раздельным туннелированием.
+MTProxy проксирует только **текстовые сообщения и медиафайлы**. Голосовые и видеозвонки **не поддерживаются**. Для звонков используйте [WireGuard](https://www.wireguard.com/) или [AmneziaWG](https://amnezia.org/) с раздельным туннелированием.
 
 ---
 
-## Системные требования
+## 📋 Системные требования
 
 - Ubuntu 22.04 LTS / 24.04 LTS
-- Доступ с правами root
+- Доступ с правами `root`
 - Сетевое подключение к интернету
 
 ---
 
-## Вклад в проект
+<p align="center">
+  <b>❤️ Поддержать проект</b><br/>
+  <a href="https://pay.cloudtips.ru/p/772a30a1"><img src="https://img.shields.io/badge/Поддержать_проект-FF5F5F?style=for-the-badge&logo=heart&logoColor=white" alt="Поддержать проект"/></a>
+</p>
 
-См. [CONTRIBUTING.md](CONTRIBUTING.md). Баг-репорты и pull requests приветствуются.
+<p align="center">
+  <a href="CONTRIBUTING.md">Вклад в проект</a> •
+  <a href="SECURITY.md">Безопасность</a> •
+  <a href="LICENSE">MIT License</a>
+</p>
 
-## Безопасность
-
-См. [SECURITY.md](SECURITY.md) — политика безопасности и архитектура.
-
-## Лицензия
-
-[MIT](LICENSE) — (c) 2026 [@ingeniare](https://github.com/ingeniare)
+<p align="center">
+  <sub>© 2026 <a href="https://getmyai.io">AI for people and business</a>AI for B2C & B2B</sub>
+</p>

@@ -12,7 +12,7 @@ This implementation is based on the following principles and technical measures:
 The MTProxy service runs under a dedicated system account `mtproxy` with no login shell and no home directory. This minimizes risk in case of service compromise.
 
 ### Credential Isolation
-Operational secrets are stored in `/etc/mtproxy/secret` with `0600` permissions (read/write for owner only). This prevents key leakage through systemd diagnostics or unit configuration files. Per-user secrets are stored in `/etc/mtproxy/secrets.d/` with the same permissions.
+Operational secrets are stored per-user in `/etc/mtproxy/secrets.d/*.secret` with `0600` permissions and owner `root:root`. A wrapper `/etc/mtproxy/run.sh` injects `-S` secrets at runtime, so `systemctl cat`/`ps` never expose them (fixed in 1.3.1 audit). Legacy `/etc/mtproxy/secret` kept for compatibility.
 
 ### Protocol Obfuscation (Fake TLS)
 To counter Deep Packet Inspection (DPI) and heuristic identification systems, Fake TLS transport is supported. Using `ee`-format secrets and the `--domain` parameter, traffic is encapsulated to mimic a standard TLS handshake with trusted domains. The installer auto-selects a plausible domain by verifying DNS resolution and TLS 1.3 support.

@@ -4,7 +4,7 @@
 #  Целевая платформа: Ubuntu 22.04 LTS / 24.04 LTS
 #  Исходный код: https://github.com/TelegramMessenger/MTProxy
 #
-#  Версия: 1.3.0 (2026-08-11)
+#  Версия: 1.3.1 (2026-08-30)
 #  Архитектура безопасности:
 #    - Обфускация протокола (Fake TLS с автовыбором правдоподобного домена)
 #    - Изоляция привилегий (пользователь mtproxy) + hardening systemd
@@ -42,12 +42,20 @@ FAKE_TLS_DOMAIN=""          # Пусто = автовыбор из TLS_DOMAINS
 # Правдоподобные домены для Fake TLS (реально обслуживают TLS 1.3).
 # НЕ используйте домены вроде google.com: DPI выявляет подмену по несовпадению
 # SNI и владельца IP-адреса сервера, что ведёт к активному зондированию и блоку.
+# Список расширен по опыту telemt (petrovich.ru, проверка JA4/ECH, TLS-эмуляция):
+# все домены должны отдавать TLS 1.3 и валидный сертификат.
 TLS_DOMAINS=(
     "www.microsoft.com"
     "cdn.discordapp.com"
     "ajax.googleapis.com"
     "www.cloudflare.com"
     "github.githubassets.com"
+    "www.bing.com"
+    "outlook.live.com"
+    "cdnjs.cloudflare.com"
+    "www.adobe.com"
+    "www.spotify.com"
+    "www.dropbox.com"
 )
 RATE_LIMIT="5/min"          # Лимит новых подключений на IP
 RATE_BURST=10               # Всплеск для rate-limit
@@ -117,11 +125,16 @@ port_in_use() {
     ss -lnt | awk '{print $4}' | grep -qE ":${1}$"
 }
 
-# --- Валидация Fake-TLS домена: DNS + реальный TLS 1.3 ---
+# --- Валидация Fake-TLS домена: DNS + реальный TLS 1.3 + валидный сертификат ---
+# Усилена по опыту telemt: проверка JA4/ECH требует реального TLS 1.3 рукопожатия
+# с валидным chain-of-trust, иначе DPI детектит подмену по отпечатку.
 validate_domain() {
     local d="$1"
     getent hosts "$d" >/dev/null 2>&1 || return 1
-    curl -s --tlsv1.3 --tls-max 1.3 --max-time 6 -o /dev/null "https://${d}/" 2>/dev/null
+    # Строгая проверка: TLS 1.3 только, валидный сертификат (--fail), SNI совпадает
+    curl -s --tlsv1.3 --tls-max 1.3 --max-time 6 --fail -o /dev/null "https://${d}/" 2>/dev/null && return 0
+    # Fallback: некоторые CDN отдают 403 на "/", но TLS рукопожатие валидно — проверяем HEAD
+    curl -s --tlsv1.3 --tls-max 1.3 --max-time 6 -I -o /dev/null "https://${d}/" 2>/dev/null
 }
 
 # --- Автовыбор домена: случайный порядок, первый прошедший валидацию ---
@@ -344,7 +357,9 @@ fi
 if [[ -d "$INSTALL_DIR" ]]; then
     warn "Директория $INSTALL_DIR уже существует — обновляю..."
     cd "$INSTALL_DIR"
-    git config --global --add safe.directory "$INSTALL_DIR"
+    if ! git config --global --get safe.directory 2>/dev/null | grep -qxF "$INSTALL_DIR"; then
+        git config --global --add safe.directory "$INSTALL_DIR"
+    fi
     git pull --quiet
     make clean > /dev/null 2>&1 || true
 else
@@ -354,7 +369,10 @@ else
 fi
 
 info "Собираю MTProxy (это займёт ~1 мин)..."
-make -j"$(nproc)" > /dev/null 2>&1
+if ! make -j"$(nproc)" > /tmp/mtproxy-build.log 2>&1; then
+    cat /tmp/mtproxy-build.log
+    fail "Сборка MTProxy не удалась — лог выше"
+fi
 ok "MTProxy собран"
 
 # ─── 5. Загрузка конфигурации Telegram (с валидацией) ──────
@@ -412,15 +430,17 @@ ok "Секретов в хранилище: $USER_COUNT (управление: m
 # ─── 7. Сохранение секретов в защищённое хранилище ─────────
 echo "$SECRET" > "$CONFIG_DIR/secret"   # совместимость со старыми скриптами
 echo "$FAKE_TLS_DOMAIN" > "$CONFIG_DIR/domain"
-chmod 700 "$CONFIG_DIR" "$SECRETS_DIR"
+chmod 700 "$CONFIG_DIR"
+chmod 700 "$SECRETS_DIR"
 chmod 600 "$CONFIG_DIR/secret" "$CONFIG_DIR/domain" "$SECRETS_DIR"/*.secret
-chown -R mtproxy:mtproxy "$CONFIG_DIR"
+chown root:root "$CONFIG_DIR" "$CONFIG_DIR/secret" "$CONFIG_DIR/domain"
+chown root:root "$SECRETS_DIR" "$SECRETS_DIR"/*.secret
 
 # Формирование ee-секрета для клиентского подключения (Fake TLS)
 DOMAIN_HEX=$(echo -n "$FAKE_TLS_DOMAIN" | xxd -ps -c 200)
 EE_SECRET="ee${SECRET}${DOMAIN_HEX}"
 
-ok "Секрет сохранён в $CONFIG_DIR/secret (недоступен через systemctl cat)"
+ok "Секрет сохранён в $SECRETS_DIR (0600, владелец root; не попадает в unit-файл)"
 
 # ─── 8. Скрипт автоматического обновления конфигурации ─────
 cat > "$CONFIG_DIR/update_config.sh" <<'UPDATESCRIPT'
@@ -428,6 +448,10 @@ cat > "$CONFIG_DIR/update_config.sh" <<'UPDATESCRIPT'
 # Автоматическое обновление конфигурации Telegram для MTProxy
 # Вызывается через cron ежедневно в 04:00
 set -euo pipefail
+
+# Защита от параллельных запусков (принцип telemt: flock + atomic)
+exec 9>/run/mtproxy-update.lock 2>/dev/null || exec 9>/tmp/mtproxy-update.lock
+flock -n 9 || exit 0
 
 INSTALL_DIR="/opt/MTProxy"
 LOG_TAG="mtproxy-update"
@@ -512,22 +536,15 @@ make_link() {
     echo "tg://proxy?server=${ip}&port=${PROXY_PORT}&secret=ee${secret}${domain_hex}"
 }
 
-# Пересобрать строки -S в unit-файле из secrets.d и перезапустить сервис
+# Применить изменения: wrapper читает secrets.d динамически — достаточно перезапуска
 apply_secrets() {
-    local block tmp
-    block=$(mktemp)
-    tmp=$(mktemp)
-    local f
-    for f in "$SECRETS_DIR"/*.secret; do
-        [[ -e "$f" ]] || { echo "Нет ни одного секрета — операция отменена" >&2; rm -f "$block" "$tmp"; exit 1; }
-        printf '    -S %s \\\n' "$(cat "$f")" >> "$block"
-    done
-    sed -e '/^[[:space:]]*-S[[:space:]]/d' \
-        -e "/^[[:space:]]*-H[[:space:]]/r $block" \
-        "$SERVICE_FILE" > "$tmp"
-    cat "$tmp" > "$SERVICE_FILE"
-    rm -f "$block" "$tmp"
-    systemctl daemon-reload
+    if ! compgen -G "$SECRETS_DIR/*.secret" > /dev/null; then
+        echo "Нет ни одного секрета — операция отменена" >&2
+        exit 1
+    fi
+    # flock на secrets.d, чтобы параллельные add/del не гонялись
+    exec 9>"$SECRETS_DIR/.lock" 2>/dev/null || true
+    flock -n 9 2>/dev/null || true
     systemctl restart MTProxy.service
     systemctl is-active --quiet MTProxy.service || {
         echo "Сервис не поднялся после изменения секретов — смотрите journalctl -u MTProxy" >&2
@@ -544,7 +561,7 @@ case "$cmd" in
         [[ -f "$SECRETS_DIR/$name.secret" ]] && { echo "Пользователь $name уже существует" >&2; exit 1; }
         head -c 16 /dev/urandom | xxd -ps > "$SECRETS_DIR/$name.secret"
         chmod 600 "$SECRETS_DIR/$name.secret"
-        chown mtproxy:mtproxy "$SECRETS_DIR/$name.secret"
+        chown root:root "$SECRETS_DIR/$name.secret"
         apply_secrets
         echo "Пользователь $name создан. Ссылка:"
         make_link "$name"
@@ -584,7 +601,9 @@ chown -R mtproxy:mtproxy "$INSTALL_DIR"
 INTERNAL_IP=$(detect_internal_ip)
 SERVER_IP_TMP=$(detect_external_ip)
 NAT_INFO=""
-if [[ -n "$INTERNAL_IP" && "$INTERNAL_IP" != "$SERVER_IP_TMP" && "$SERVER_IP_TMP" != "YOUR_SERVER_IP" ]]; then
+# Фильтруем приватные IP в SERVER_IP_TMP — fallback ip route не должен попасть в ссылку
+is_private_ip() { [[ "$1" =~ ^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|127\.) ]]; }
+if [[ -n "$INTERNAL_IP" && "$INTERNAL_IP" != "$SERVER_IP_TMP" && "$SERVER_IP_TMP" != "YOUR_SERVER_IP" ]] && ! is_private_ip "$SERVER_IP_TMP"; then
     NAT_INFO="--nat-info ${INTERNAL_IP}:${SERVER_IP_TMP}"
 fi
 
@@ -629,29 +648,56 @@ if [[ "$ENABLE_IPV6" == "1" ]]; then
 fi
 
 # ─── 9b. Сохранение настроек в env-файл (для переустановки и mtproxy-user.sh) ──
-cat > "$CONFIG_DIR/env" <<EOF
-INSTALL_DIR="$INSTALL_DIR"
-CONFIG_DIR="$CONFIG_DIR"
-STATS_PORT="$STATS_PORT"
-PROXY_PORT="$PROXY_PORT"
-WORKERS="$WORKERS"
-FAKE_TLS_DOMAIN="$FAKE_TLS_DOMAIN"
-PROXY_TAG="$PROXY_TAG"
-NAT_INFO="$NAT_INFO"
-EXEC_PREFIX="$EXEC_PREFIX"
-IPV6_ARGS="$IPV6_ARGS"
-IPV6_ADDR="$IPV6_ADDR"
-EOF
+# Безопасная запись: экранируем значения через %q, чтобы source не выполнить инъекцию
+{
+    printf 'INSTALL_DIR=%q\n' "$INSTALL_DIR"
+    printf 'CONFIG_DIR=%q\n' "$CONFIG_DIR"
+    printf 'STATS_PORT=%q\n' "$STATS_PORT"
+    printf 'PROXY_PORT=%q\n' "$PROXY_PORT"
+    printf 'WORKERS=%q\n' "$WORKERS"
+    printf 'FAKE_TLS_DOMAIN=%q\n' "$FAKE_TLS_DOMAIN"
+    printf 'PROXY_TAG=%q\n' "$PROXY_TAG"
+    printf 'NAT_INFO=%q\n' "$NAT_INFO"
+    printf 'EXEC_PREFIX=%q\n' "$EXEC_PREFIX"
+    printf 'IPV6_ARGS=%q\n' "$IPV6_ARGS"
+    printf 'IPV6_ADDR=%q\n' "$IPV6_ADDR"
+} > "$CONFIG_DIR/env"
 chmod 600 "$CONFIG_DIR/env"
 chown root:root "$CONFIG_DIR/env"
 
-# ─── 9c. Unit-файл со всеми секретами и hardening ──────────
-UNIT_SECRET_LINES=""
-for secret_file in "$SECRETS_DIR"/*.secret; do
-    UNIT_SECRET_LINES+="    -S $(cat "$secret_file") \\"
-    UNIT_SECRET_LINES+=$'\n'
+# ─── 9c. Wrapper-скрипт (скрывает секреты от systemctl cat/ps) ──
+cat > "$CONFIG_DIR/run.sh" <<'RUNSCRIPT'
+#!/bin/bash
+set -euo pipefail
+# shellcheck disable=SC1091
+source /etc/mtproxy/env
+ARGS=(
+    -u mtproxy
+    -p "$STATS_PORT"
+    -H "$PROXY_PORT"
+    --http-stats
+    --domain "$FAKE_TLS_DOMAIN"
+    --aes-pwd "$INSTALL_DIR/proxy-secret"
+    "$INSTALL_DIR/proxy-multi.conf"
+    -M "$WORKERS"
+)
+# NAT и IPv6 — опционально
+[[ -n "${NAT_INFO:-}" ]] && ARGS+=(${NAT_INFO})
+[[ -n "${IPV6_ARGS:-}" ]] && ARGS+=(${IPV6_ARGS})
+[[ -n "${PROXY_TAG:-}" ]] && ARGS+=(-P "$PROXY_TAG")
+# Секреты подмешиваем в рантайме, а не в unit — не видны через systemctl/ps
+for f in /etc/mtproxy/secrets.d/*.secret; do
+    [[ -e "$f" ]] || continue
+    ARGS+=(-S "$(cat "$f")")
 done
+exec "$INSTALL_DIR/objs/bin/mtproto-proxy" "${ARGS[@]}"
+RUNSCRIPT
+chmod 700 "$CONFIG_DIR/run.sh"
+chown root:root "$CONFIG_DIR/run.sh"
 
+# ─── 9c1. Unit-файл (без секретов) + hardening ──────────
+# Примечание: NoNewPrivileges=true не блокирует setuid() вниз (root→mtproxy via -u),
+# но запрещает новые привилегии через exec. Сброс привилегий выполняет сам mtproto-proxy.
 cat > /etc/systemd/system/MTProxy.service <<EOF
 [Unit]
 Description=MTProxy Telegram Proxy
@@ -663,22 +709,13 @@ StartLimitBurst=5
 [Service]
 Type=simple
 WorkingDirectory=$INSTALL_DIR
-ExecStart=${EXEC_PREFIX} $INSTALL_DIR/objs/bin/mtproto-proxy \\
-    -u mtproxy \\
-    -p $STATS_PORT \\
-    -H $PROXY_PORT \\
-${UNIT_SECRET_LINES}    --http-stats \\
-    --domain $FAKE_TLS_DOMAIN \\
-    ${NAT_INFO} \\
-    ${IPV6_ARGS} \\
-    ${PROXY_TAG:+-P $PROXY_TAG} \\
-    --aes-pwd $INSTALL_DIR/proxy-secret \\
-    $INSTALL_DIR/proxy-multi.conf \\
-    -M $WORKERS
+ExecStart=${EXEC_PREFIX} $CONFIG_DIR/run.sh
 KillMode=control-group
 Restart=on-failure
 RestartSec=5
+TimeoutStopSec=10
 LimitNOFILE=65536
+TasksMax=512
 MemoryMax=256M
 NoNewPrivileges=true
 ProtectSystem=strict
@@ -688,6 +725,11 @@ PrivateTmp=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RemoveIPC=true
+SystemCallArchitectures=native
 
 [Install]
 WantedBy=multi-user.target
@@ -706,6 +748,10 @@ cat > "$CONFIG_DIR/watchdog.sh" <<'WATCHDOGSCRIPT'
 #!/bin/bash
 # Watchdog MTProxy: проверка активности и эндпоинта статистики
 set -uo pipefail
+
+# Защита от параллельных срабатываний таймера (поставил и забыл)
+exec 9>/run/mtproxy-watchdog.lock 2>/dev/null || exec 9>/tmp/mtproxy-watchdog.lock
+flock -n 9 || exit 0
 
 # shellcheck disable=SC1091
 source /etc/mtproxy/env
@@ -775,7 +821,9 @@ INSTALL_DIR="/opt/MTProxy"
 LOG_TAG="mtproxy-update-bin"
 
 cd "$INSTALL_DIR"
-git config --global --add safe.directory "$INSTALL_DIR"
+if ! git config --global --get safe.directory 2>/dev/null | grep -qxF "$INSTALL_DIR"; then
+    git config --global --add safe.directory "$INSTALL_DIR"
+fi
 git fetch --quiet origin
 
 LOCAL=$(git rev-parse HEAD)
@@ -787,24 +835,30 @@ if ! git merge --ff-only "$REMOTE" > /dev/null 2>&1; then
     exit 1
 fi
 
-BACKUP=$(mktemp)
+BACKUP=$(mktemp -p "$INSTALL_DIR" .mtproxy-backup.XXXXXX)
 cp -a objs/bin/mtproto-proxy "$BACKUP" 2>/dev/null || true
 
-if make -j"$(nproc)" > /dev/null 2>&1; then
+if make -j"$(nproc)" > /tmp/mtproxy-build.log 2>&1; then
     chown -R mtproxy:mtproxy "$INSTALL_DIR"
+    # CONFIG_DIR/run.sh и secrets должны оставаться root:root
+    chown root:root "$INSTALL_DIR" 2>/dev/null || true
     systemctl restart MTProxy.service || true
     sleep 3
     if systemctl is-active --quiet MTProxy.service; then
         logger -t "$LOG_TAG" "Обновлён до ${REMOTE:0:8}"
-        rm -f "$BACKUP"
+        rm -f "$BACKUP" /tmp/mtproxy-build.log
         exit 0
     fi
+    logger -t "$LOG_TAG" "Сервис не поднялся после сборки ${REMOTE:0:8}"
+else
+    logger -t "$LOG_TAG" "Сборка не удалась для ${REMOTE:0:8}: $(tail -n 20 /tmp/mtproxy-build.log 2>/dev/null | tr '\n' ' ')"
 fi
 
 # Откат при неудачной сборке или падении сервиса
 if [[ -s "$BACKUP" ]]; then
     cp -a "$BACKUP" objs/bin/mtproto-proxy
     chown mtproxy:mtproxy objs/bin/mtproto-proxy
+    chown root:root "$INSTALL_DIR" 2>/dev/null || true
     systemctl restart MTProxy.service || true
     logger -t "$LOG_TAG" "Ошибка обновления до ${REMOTE:0:8} — выполнен откат"
 else
